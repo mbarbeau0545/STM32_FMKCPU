@@ -1,0 +1,27 @@
+POur rendre ce module indépendant de l'ecu, il faut faire comme paramètre d'enter$
+de chaque fonction public un enum FMKCPU_INTERRUPT_LINE_0_99 = PWM 
+                                  FMKCPU_INTERRUPT_LINE_100_199 = IC or ...
+                                  FMKCPU_INTERRUPT_LINE_200_299 = Event etc
+mapper ces enums sur des channels et timer dans la configPrivate en fonction de l'excel 
+dans les autres configPrivate utiliser les Timer et Channel ou INTerrupt Line ??
+
+Il faut gérer les syclocks, il faut savoir en permanence les fréquences des horloges et les 
+rendres disponibles aux autres modules
+
+POur le stm32 G family 
+- Sysclock choisi par le user < 170MHz
+
+- Ppur des sysclock inférieur ou égals 120Mhz, on met APB1 et APB2 égale à sysclock
+- Pour des sysclock supérieur à 120Mhz, on met APB1 et APB2 égale à 120Mhz
+
+- Pour PLLP on met aux alentours de 40MHz, on utilisera cette horloge pour l'ADC 60MHz max 
+
+- Pour PLLQ, on met 60 Mhz, pour des usages quelconques, 
+
+Pour le stm32 F Family 
+
+- SysClock choisi par le user < 48Hz
+
+- APB1 et APB2 = SysClock.
+
+- Pour l'adc on use le prescaler et ce sera très bien car 

@@ -1,0 +1,8 @@
+POur le prescaler de l'init chacun gère sa merde, FMKCPU fourni deux API
+une pour connaître les valeurs de fréquence des horloges et une autre pour savoir 
+quel est la source de l'horloge d'un périphérique.
+
+Pour les PWM, il faut une grande valeur d' ARR pour une meilleur résolution du dutyCycle en 16 et 32 bits
+POur les EVent, il faut une valeur d'ARR grande mais sans trop d'importance plus de 40000 est cool 
+POur les IC, plus l'ARR est grand -> la résolution temporelle est grande (i.e la plage)
+                plus le prescaler est élevé plus la résolution diminue mais le plage de temps mesurable s'étend
