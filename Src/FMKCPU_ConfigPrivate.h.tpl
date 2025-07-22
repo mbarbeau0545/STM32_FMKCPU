@@ -74,7 +74,18 @@
     /* CAUTION : Automatic generated code section for Structure: Start */
 
     /* CAUTION : Automatic generated code section for Structure: End */
-
+    /**< Structure for Dma Channel Configuration */
+    typedef struct 
+    {
+        DMA_Channel_TypeDef * Instance;
+        t_eFMKCPU_IRQNType c_IRQNType_e;
+    } t_sFMKCPU_DmaChnlCfg;
+    /**< Structure for Dma Configuration */
+    typedef struct 
+    {
+        t_eFMKCPU_ClockPort c_clock_e;
+        t_sFMKCPU_DmaChnlCfg chnlCfg_as[FMKCPU_DMA_CHANNEL_NB];
+    } t_sFMKCPU_DmaCfg;
     /**< Structure for repertory all clock enable/disable function */
     typedef struct
     {
@@ -163,6 +174,100 @@
     };
 
     /* CAUTION : Automatic generated code section for Variable: Start */
+    /**< Variable to Dma Configuration */
+    const t_sFMKCPU_DmaCfg c_FmkCpu_DmaCfg_as[FMKCPU_DMA_CTRL_NB] = {
+        [FMKCPU_DMA_CTRL_1] = {
+            .c_clock_e = FMKCPU_RCC_CLK_DMA1,
+            .chnlCfg_as = {
+                [FMKCPU_DMA_CHANNEL_1] = {
+                    .Instance = DMA1_Channel1,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL1_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_2] = {
+                    .Instance = DMA1_Channel2,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL2_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_3] = {
+                    .Instance = DMA1_Channel3,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL3_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_4] = {
+                    .Instance = DMA1_Channel4,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL4_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_5] = {
+                    .Instance = DMA1_Channel5,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL5_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_6] = {
+                    .Instance = DMA1_Channel6,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL6_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_7] = {
+                    .Instance = DMA1_Channel7,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL7_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_8] = {
+                    .Instance = DMA1_Channel8,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA1_CHANNEL8_IRQN,
+                },
+
+            },
+        },
+        [FMKCPU_DMA_CTRL_2] = {
+            .c_clock_e = FMKCPU_RCC_CLK_DMA2,
+            .chnlCfg_as = {
+                [FMKCPU_DMA_CHANNEL_1] = {
+                    .Instance = DMA2_Channel1,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL1_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_2] = {
+                    .Instance = DMA2_Channel2,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL2_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_3] = {
+                    .Instance = DMA2_Channel3,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL3_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_4] = {
+                    .Instance = DMA2_Channel4,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL4_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_5] = {
+                    .Instance = DMA2_Channel5,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL5_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_6] = {
+                    .Instance = DMA2_Channel6,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL6_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_7] = {
+                    .Instance = DMA2_Channel7,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL7_IRQN,
+                },
+
+                [FMKCPU_DMA_CHANNEL_8] = {
+                    .Instance = DMA2_Channel8,
+                   .c_IRQNType_e = FMKCPU_NVIC_DMA2_CHANNEL8_IRQN,
+                },
+
+            },
+        },
+    };
+
     /**< Set the NVIC Priority for all NVIC_IRqn Priority */
     const t_eFMKCPU_NVICPriority c_FMKCPU_IRQNPriority_ae[FMKCPU_NVIC_NB] = {
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  WWDG_IRQn
@@ -414,7 +519,98 @@
     //********************************************************************************
     //                      Public functions - Prototyupes
     //********************************************************************************
+    /* CAUTION : Automatic generated code section for DMA_Channel IRQHandler: Start */
+    /**
+    * @brief This function handles DMA Channel1 interrupt.
+    */
+    void DMA2_Channel1_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_2, FMKCPU_DMA_CHANNEL_1));
+    return;
+    }
 
+    /**
+    * @brief This function handles DMA Channel2 interrupt.
+    */
+    void DMA2_Channel2_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_2, FMKCPU_DMA_CHANNEL_2));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel3 interrupt.
+    */
+    void DMA2_Channel3_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_2, FMKCPU_DMA_CHANNEL_3));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel4 interrupt.
+    */
+    void DMA2_Channel4_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_2, FMKCPU_DMA_CHANNEL_4));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel5 interrupt.
+    */
+    void DMA2_Channel5_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_2, FMKCPU_DMA_CHANNEL_5));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel1 interrupt.
+    */
+    void DMA1_Channel1_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_1));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel2 interrupt.
+    */
+    void DMA1_Channel2_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_2));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel3 interrupt.
+    */
+    void DMA1_Channel3_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_3));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel4 interrupt.
+    */
+    void DMA1_Channel4_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_4));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel5 interrupt.
+    */
+    void DMA1_Channel5_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_5));
+    return;
+    }
+
+    /* CAUTION : Automatic generated code section for DMA_Channel IRQHandler: End */
 #endif // FMKCPU_CONFIGPRIVATE_H_INCLUDED           
 //************************************************************************************
 // End of File

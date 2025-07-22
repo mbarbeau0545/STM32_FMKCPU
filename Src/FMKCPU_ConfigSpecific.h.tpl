@@ -19,6 +19,7 @@
     // *                      Includes
     // ********************************************************************
     #include "FMK_CFG/FMKCFG_ConfigFiles/FMKCPU_ConfigPublic.h"
+    #include "FMK_HAL/FMK_CPU/Src/FMK_CPU.h"
     #include "TypeCommon.h"
     // ********************************************************************
     // *                      Defines
@@ -44,8 +45,6 @@
     // ********************************************************************
     // *                      Variables
     // ********************************************************************
-    
-    extern t_sFMKCPU_DmaInfo g_DmaInfo_as[FMKCPU_DMA_CTRL_NB];
 
     //********************************************************************************
     //                      Public functions - Prototyupes

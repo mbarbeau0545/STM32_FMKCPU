@@ -246,6 +246,15 @@
     */
     t_eReturnCode FMKCPU_GetSysClkValue(   t_eFMKCPU_SysClkOsc f_ClkOsc_e,
                                         t_uint16 * f_OscValueMHz_pu16);
+    /**
+    *
+    *	@brief      DO NOT USE, Function to get the Handle Type def for IRQN_Handler Function
+    *
+    *	@param[in]  f_timer_e                : enum value for the timer, value from @ref t_eFMKTIM_Timer
+    *
+    *
+    */
+    DMA_HandleTypeDef * FMKCPU_PRIVATE_GetHandleTypeDef(t_eFMKCPU_DmaController f_dmaCtrl_e, t_eFMKCPU_DmaChnl f_chnle_e);
 #endif // FMKCPU_H_INCLUDED           
 //************************************************************************************
 // End of File

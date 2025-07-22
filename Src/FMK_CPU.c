@@ -28,11 +28,37 @@
 // *                      Types
 // ********************************************************************
 //-----------------------------ENUM TYPES-----------------------------//
+typedef enum 
+{
+    FMKCPU_DMA_ERRSTATE_OK = 0x000U,                     /**< No error detected */
+    FMKCPU_DMA_ERRSTATE_TRANSFER_COMPLETE = 0x001,       /**< THe transfer is completed with an error */
+    FMKCPU_DMA_ERRSTATE_TRANSFER_ERROR = 0x002,          /**< THe transfer is incomplete with an error */
+    FMKCPU_DMA_ERRSTATE_FIFO = 0x004,                    /**< FIFO error, over/under debit from FIFO to DMA */
+    FMKCPU_DMA_ERRSTATE_DIRECT_MODE = 0x008,             /**< An error with direct mode DMA has been detected*/
+    FMKCPU_DMA_ERRSTATE_INVALID_CHANNEL = 0x010,         /**< DMA cannal invalid */
+    FMKCPU_DMA_ERRSTATE_CONFIGURATION = 0x020,           /**< A configuration error has been detected */
+    FMKCPU_DMA_ERRSTATE_PRIORITY = 0x040,                /**< Priority DMA has not been respected */
+    FMKCPU_DMA_ERRSTATE_MEM_ALLOCATION = 0x080,          /**< Error allocation memory (FIFO not allowed) */
+    FMKCPU_DMA_ERRSTATE_TIMEOUT = 0x100                  /**< Timeout delay (transfer has take too many time)*/
+} t_eFMKCPU_DmaChnlErr;
+//-----------------------------TYPEDEF TYPES---------------------------//
+typedef struct
+{
+    DMA_HandleTypeDef bspDma_s;            /**< @ref  DMA_HandleTypeDef*/
+    t_eFMKCPU_IRQNType c_IRQNType_e;                   /**< NVIC channel interruption config*/
+    t_eFMKCPU_DmaChnlErr chnlErr_e;         /**< @ref t_eFMKCPU_DmaChnlErr*/
+    t_bool isChnlConfigured_b;
+} t_sFMKCPU_DmaChnlInfo;
+
+typedef struct 
+{
+    t_sFMKCPU_DmaChnlInfo channel_as[FMKCPU_DMA_CHANNEL_NB];        /**< @ref  t_sFMKCPU_DmaChnlInfo*/
+    t_eFMKCPU_ClockPort c_clock_e;                              /**< constant to store the clock for each ADC */                                         /**< Flag channel is configured */
+} t_sFMKCPU_DmaInfo;
 
 /* CAUTION : Automatic generated code section for Enum: Start */
 
 /* CAUTION : Automatic generated code section for Enum: End */
-//-----------------------------TYPEDEF TYPES---------------------------//
 /* CAUTION : Automatic generated code section for Structure: Start */
 
 /* CAUTION : Automatic generated code section for Structure: End */
@@ -45,6 +71,7 @@
 // ********************************************************************
 // *                      Variables
 // ********************************************************************
+t_sFMKCPU_DmaInfo g_DmaInfo_as[FMKCPU_DMA_CTRL_NB];
 t_eFMKCPU_ClockPortOpe g_DmaMuxState_ae[FMKCPU_DMA_MUX_NB];
 t_eFMKCPU_ClockPortOpe g_DmaCtrlState_ae[FMKCPU_DMA_CTRL_NB];
 
@@ -111,7 +138,7 @@ static t_eReturnCode s_FMKCPU_Get_BspNVICPriority(t_eFMKCPU_NVICPriority f_prior
 */
 static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
                                             t_eFMKCPU_DmaType f_Type_e,
-                                            DMA_HandleTypeDef * f_bspDma_ps,
+                                            DMA_HandleTypeDef * f_bspDma_s,
                                             t_eFMKCPU_DmaTransferPriority f_dmaPrio_e,
                                             t_uFMKCPU_DmaHandleType * f_modHandle_pu);
 
@@ -144,7 +171,7 @@ static t_eReturnCode s_FMKCPU_SetDmaHwInit(t_eFMKCPU_DmaController f_dmaCtrl_e);
 *
 */
 static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
-                                        DMA_HandleTypeDef * f_bspDma_ps,
+                                        DMA_HandleTypeDef * f_bspDma_s,
                                         t_uFMKCPU_DmaHandleType * f_modHandle_pu);
 
 /**
@@ -174,12 +201,16 @@ t_eReturnCode FMKCPU_Init(void)
     //--------- Loop on every Dma ---------//
     for(idxDma_u8 = (t_uint8)0 ; idxDma_u8 < FMKCPU_DMA_CTRL_NB ; idxDma_u8++)
     {
-
+        g_DmaInfo_as[idxDma_u8].c_clock_e = c_FmkCpu_DmaCfg_as[idxDma_u8].c_clock_e;
         //--------- Loop on every Channel ---------//
         for(idxChnl_u8 = (t_uint8)0 ; idxChnl_u8 < FMKCPU_DMA_CHANNEL_NB ; idxChnl_u8++)
         {
-            g_DmaInfo_as[idxDma_u8].channel_as[idxDma_u8].isChnlConfigured_b = (t_bool)False;
-            g_DmaInfo_as[idxDma_u8].channel_as[idxDma_u8].chnlErr_e = FMKCPU_DMA_ERRSTATE_OK;
+            g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].c_IRQNType_e =
+                c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].c_IRQNType_e;
+            g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].bspDma_s.Instance =
+                (DMA_Channel_TypeDef *)c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].Instance;
+            g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].isChnlConfigured_b = (t_bool)False;
+            g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].chnlErr_e = FMKCPU_DMA_ERRSTATE_OK;
         }
 
         g_DmaCtrlState_ae[idxDma_u8] = FMKCPU_CLOCKPORT_OPE_DISABLE;
@@ -691,26 +722,26 @@ t_eReturnCode FMKCPU_RqstDmaInit(   t_eFMKCPU_DmaRqst f_DmaRqstType,
                 //--------- Configure Dma Channel ---------//
                 Ret_e = s_FMKCPU_Set_DmaBspCfg( f_DmaRqstType, 
                                                 f_Type_e,
-                                                &DmaChnl_ps->bspDma_ps,
+                                                &DmaChnl_ps->bspDma_s,
                                                 c_FMKCPU_DmaRqstCfg_as[f_DmaRqstType].transfPrio_e,
                                                 (t_uFMKCPU_DmaHandleType *)f_ModuleHandle_pv);
             }
             if(Ret_e == RC_OK)
             {
                 //---------call Bsp Init ---------//
-                bspRet_e = HAL_DMA_Init(&DmaChnl_ps->bspDma_ps);
+                bspRet_e = HAL_DMA_Init(&DmaChnl_ps->bspDma_s);
                 if(bspRet_e == HAL_OK)
                 {
                     //------ Link DMA Management ------//
                     Ret_e = s_FMKCPU_LinkDma( f_Type_e,
-                                            &DmaChnl_ps->bspDma_ps,
+                                            &DmaChnl_ps->bspDma_s,
                                             (t_uFMKCPU_DmaHandleType *)f_ModuleHandle_pv);
 
                     if(Ret_e == RC_OK)
                     {
                         DmaChnl_ps->isChnlConfigured_b = (t_bool)True;
                         //--------- Enable The Complete Callback ---------//
-                        __HAL_DMA_ENABLE_IT(&DmaChnl_ps->bspDma_ps, DMA_IT_TC); // transfer-complete
+                        __HAL_DMA_ENABLE_IT(&DmaChnl_ps->bspDma_s, DMA_IT_TC); // transfer-complete
                     }
                 }
                 else
@@ -829,7 +860,7 @@ static t_eReturnCode s_FMKCPU_SetDmaHwInit(t_eFMKCPU_DmaController f_dmaCtrl_e)
  ***********************************/
 static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
                                                 t_eFMKCPU_DmaType f_Type_e,
-                                                DMA_HandleTypeDef * f_bspDma_ps,
+                                                DMA_HandleTypeDef * f_bspDma_s,
                                                 t_eFMKCPU_DmaTransferPriority f_dmaPrio_e,
                                                 t_uFMKCPU_DmaHandleType * f_modHandle_pu)
 {
@@ -841,7 +872,7 @@ static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
         Ret_e = RC_ERROR_PARAM_INVALID;
         ASSERT((t_uint16)Ret_e);
     }
-    if(f_bspDma_ps == (DMA_HandleTypeDef *)NULL)
+    if(f_bspDma_s == (DMA_HandleTypeDef *)NULL)
     {
         Ret_e = RC_ERROR_PTR_NULL;
         ASSERT((t_uint16)Ret_e);
@@ -853,10 +884,10 @@ static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
     if(Ret_e == RC_OK)
     {
         //------ Set Priority ------//
-        f_bspDma_ps->Init.Priority = bspPriority_u32;
+        f_bspDma_s->Init.Priority = bspPriority_u32;
         
         //------ Set request dma Init ------//
-        Ret_e = FMKCPU_SetRequestType(f_RqstType_e, f_bspDma_ps);
+        Ret_e = FMKCPU_SetRequestType(f_RqstType_e, f_bspDma_s);
 
         //------ Set Init Depending On Dma Type ------//
         if(Ret_e == RC_OK)
@@ -865,34 +896,34 @@ static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
             {
                 case FMKCPU_DMA_TYPE_ADC:
                 {
-                    f_bspDma_ps->Init.Direction = DMA_PERIPH_TO_MEMORY;
-                    f_bspDma_ps->Init.Mode      = FMKCPU_ADC_DMA_MODE;
-                    f_bspDma_ps->Init.PeriphInc = DMA_PINC_DISABLE;
-                    f_bspDma_ps->Init.MemInc    = DMA_MINC_ENABLE;
-                    f_bspDma_ps->Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
-                    f_bspDma_ps->Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+                    f_bspDma_s->Init.Direction = DMA_PERIPH_TO_MEMORY;
+                    f_bspDma_s->Init.Mode      = FMKCPU_ADC_DMA_MODE;
+                    f_bspDma_s->Init.PeriphInc = DMA_PINC_DISABLE;
+                    f_bspDma_s->Init.MemInc    = DMA_MINC_ENABLE;
+                    f_bspDma_s->Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+                    f_bspDma_s->Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
                 
                     break;
                 }
                 case FMKCPU_DMA_TYPE_UART_RX:
                 {
-                    f_bspDma_ps->Init.Direction = DMA_PERIPH_TO_MEMORY;
-                    f_bspDma_ps->Init.Mode      = FMKCPU_UART_RX_DMA_MODE;
-                    f_bspDma_ps->Init.PeriphInc = DMA_PINC_DISABLE;
-                    f_bspDma_ps->Init.MemInc    = DMA_MINC_ENABLE;
-                    f_bspDma_ps->Init.MemDataAlignment     = DMA_MDATAALIGN_BYTE;
-                    f_bspDma_ps->Init.PeriphDataAlignment  = DMA_PDATAALIGN_BYTE;
+                    f_bspDma_s->Init.Direction = DMA_PERIPH_TO_MEMORY;
+                    f_bspDma_s->Init.Mode      = FMKCPU_UART_RX_DMA_MODE;
+                    f_bspDma_s->Init.PeriphInc = DMA_PINC_DISABLE;
+                    f_bspDma_s->Init.MemInc    = DMA_MINC_ENABLE;
+                    f_bspDma_s->Init.MemDataAlignment     = DMA_MDATAALIGN_BYTE;
+                    f_bspDma_s->Init.PeriphDataAlignment  = DMA_PDATAALIGN_BYTE;
                     
                     break;
                 }
                 case FMKCPU_DMA_TYPE_UART_TX:
                 {
-                    f_bspDma_ps->Init.Direction = DMA_MEMORY_TO_PERIPH;
-                    f_bspDma_ps->Init.Mode      = FMKCPU_UART_TX_DMA_MODE;
-                    f_bspDma_ps->Init.PeriphInc = DMA_PINC_DISABLE;
-                    f_bspDma_ps->Init.MemInc    = DMA_MINC_ENABLE;
-                    f_bspDma_ps->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-                    f_bspDma_ps->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+                    f_bspDma_s->Init.Direction = DMA_MEMORY_TO_PERIPH;
+                    f_bspDma_s->Init.Mode      = FMKCPU_UART_TX_DMA_MODE;
+                    f_bspDma_s->Init.PeriphInc = DMA_PINC_DISABLE;
+                    f_bspDma_s->Init.MemInc    = DMA_MINC_ENABLE;
+                    f_bspDma_s->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+                    f_bspDma_s->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
                     break;
                 }
                 case FMKCPU_DMA_TYPE_USART_RX:
@@ -909,22 +940,22 @@ static t_eReturnCode s_FMKCPU_Set_DmaBspCfg(t_eFMKCPU_DmaRqst f_RqstType_e,
                 }
                 case FMKCMAC_DMA_TYPE_TIM_CHNL_ECDR_CC1:
                 {
-                    f_bspDma_ps->Init.Direction = DMA_PERIPH_TO_MEMORY;
-                    f_bspDma_ps->Init.Mode      = FMKCPU_TIM_CHNL_ECDR_CC1_MODE;
-                    f_bspDma_ps->Init.PeriphInc = DMA_PINC_DISABLE;
-                    f_bspDma_ps->Init.MemInc    = DMA_MINC_ENABLE;
-                    f_bspDma_ps->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-                    f_bspDma_ps->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+                    f_bspDma_s->Init.Direction = DMA_PERIPH_TO_MEMORY;
+                    f_bspDma_s->Init.Mode      = FMKCPU_TIM_CHNL_ECDR_CC1_MODE;
+                    f_bspDma_s->Init.PeriphInc = DMA_PINC_DISABLE;
+                    f_bspDma_s->Init.MemInc    = DMA_MINC_ENABLE;
+                    f_bspDma_s->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+                    f_bspDma_s->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
                     break;
                 }
                 case FMKCMAC_DMA_TYPE_TIM_CHNL_ECDR_CC2:
                 {
-                    f_bspDma_ps->Init.Direction = DMA_PERIPH_TO_MEMORY;
-                    f_bspDma_ps->Init.Mode      = FMKCPU_TIM_CHNL_ECDR_CC2_MODE;
-                    f_bspDma_ps->Init.PeriphInc = DMA_PINC_DISABLE;
-                    f_bspDma_ps->Init.MemInc    = DMA_MINC_ENABLE;
-                    f_bspDma_ps->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-                    f_bspDma_ps->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+                    f_bspDma_s->Init.Direction = DMA_PERIPH_TO_MEMORY;
+                    f_bspDma_s->Init.Mode      = FMKCPU_TIM_CHNL_ECDR_CC2_MODE;
+                    f_bspDma_s->Init.PeriphInc = DMA_PINC_DISABLE;
+                    f_bspDma_s->Init.MemInc    = DMA_MINC_ENABLE;
+                    f_bspDma_s->Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+                    f_bspDma_s->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
                 }
                 case FMKCPU_DMA_TYPE_SPI:
                 {
@@ -990,7 +1021,7 @@ static t_eReturnCode s_FMKCPU_Get_DmaBspPriority(t_eFMKCPU_DmaTransferPriority f
  * s_FMKCPU_LinkDma
  ***********************************/
 static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
-                                        DMA_HandleTypeDef * f_bspDma_ps,
+                                        DMA_HandleTypeDef * f_bspDma_s,
                                         t_uFMKCPU_DmaHandleType * f_modHandle_pu)
 {
     t_eReturnCode Ret_e = RC_OK;
@@ -1001,7 +1032,7 @@ static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
         ASSERT((t_uint16)Ret_e);
     }
     if((f_modHandle_pu == (t_uFMKCPU_DmaHandleType *)NULL)
-    || (f_bspDma_ps == (DMA_HandleTypeDef *)NULL))
+    || (f_bspDma_s == (DMA_HandleTypeDef *)NULL))
     {
         Ret_e = RC_ERROR_PTR_NULL;
         ASSERT((t_uint16)Ret_e);
@@ -1011,29 +1042,29 @@ static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
         switch (f_DmaType_e)
         {   
             case FMKCPU_DMA_TYPE_ADC:
-                __HAL_LINKDMA(&f_modHandle_pu->adcHandle_s, DMA_Handle, *f_bspDma_ps);
+                __HAL_LINKDMA(&f_modHandle_pu->adcHandle_s, DMA_Handle, *f_bspDma_s);
                 break;
           
             case FMKCPU_DMA_TYPE_UART_RX:
-                __HAL_LINKDMA((&f_modHandle_pu->uartHandle_s), hdmarx, *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->uartHandle_s), hdmarx, *f_bspDma_s);
                 break;
 
             case FMKCPU_DMA_TYPE_UART_TX:
-                __HAL_LINKDMA((&f_modHandle_pu->uartHandle_s), hdmatx, *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->uartHandle_s), hdmatx, *f_bspDma_s);
                 break;
             
             case FMKCPU_DMA_TYPE_USART_RX:
-                __HAL_LINKDMA((&f_modHandle_pu->usartHandle_s), hdmarx, *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->usartHandle_s), hdmarx, *f_bspDma_s);
                 break;
             
             case FMKCPU_DMA_TYPE_USART_TX:
-                __HAL_LINKDMA((&f_modHandle_pu->usartHandle_s), hdmatx, *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->usartHandle_s), hdmatx, *f_bspDma_s);
                 break;
             case FMKCMAC_DMA_TYPE_TIM_CHNL_ECDR_CC1:
-                __HAL_LINKDMA((&f_modHandle_pu->timHandle_s), hdma[TIM_DMA_ID_CC1], *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->timHandle_s), hdma[TIM_DMA_ID_CC1], *f_bspDma_s);
                 break;
             case FMKCMAC_DMA_TYPE_TIM_CHNL_ECDR_CC2:
-                __HAL_LINKDMA((&f_modHandle_pu->timHandle_s), hdma[TIM_DMA_ID_CC2], *f_bspDma_ps);
+                __HAL_LINKDMA((&f_modHandle_pu->timHandle_s), hdma[TIM_DMA_ID_CC2], *f_bspDma_s);
                 break;
             case FMKCPU_DMA_TYPE_SPI:
             case FMKCPU_DMA_TYPE_NB:
@@ -1044,6 +1075,18 @@ static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
     }
 
     return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_PRIVATE_GetHandleTypeDef
+ *********************************/
+DMA_HandleTypeDef * FMKCPU_PRIVATE_GetHandleTypeDef(t_eFMKCPU_DmaController f_dmaCtrl_e, t_eFMKCPU_DmaChnl f_chnle_e)
+{
+    if(g_DmaInfo_as[f_dmaCtrl_e].channel_as[f_chnle_e].isChnlConfigured_b == (t_bool)False)
+    {
+        ASSERT((t_uint16)0);
+    }
+    return (DMA_HandleTypeDef *)(&g_DmaInfo_as[f_dmaCtrl_e].channel_as[f_chnle_e].bspDma_s);
 }
 //********************************************************************************
 //                      Local functions - Implementation

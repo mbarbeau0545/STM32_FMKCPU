@@ -130,7 +130,7 @@
     */
     typedef enum
     {
-        FMKCPU_SYS_CLOCK_HSE = 0x0,                /**< Reference to Hardware Bus HSE */
+        FMKCPU_SYS_CLOCK_HSE = 0,                /**< Reference to Hardware Bus HSE */
         FMKCPU_SYS_CLOCK_HSI,                      /**< Reference to Hardware Bus HSI */
         FMKCPU_SYS_CLOCK_SYSTEM,                   /**< Reference to Hardware Bus SYSTEM */
         FMKCPU_SYS_CLOCK_HCLK1,                    /**< Reference to Hardware Bus HCLK1 */
@@ -149,7 +149,7 @@
     */
     typedef enum
     {
-        FMKCPU_RCC_CLK_DMA1 = 0x0,               /**< Reference to RCC Clock DMA1 */
+        FMKCPU_RCC_CLK_DMA1 = 0,               /**< Reference to RCC Clock DMA1 */
         FMKCPU_RCC_CLK_DMA2,                     /**< Reference to RCC Clock DMA2 */
         FMKCPU_RCC_CLK_DMAMUX1,                  /**< Reference to RCC Clock DMAMUX1 */
         FMKCPU_RCC_CLK_CORDIC,                   /**< Reference to RCC Clock CORDIC */
@@ -215,7 +215,7 @@
     */
     typedef enum
     {
-        FMKCPU_NVIC_WWDG_IRQN = 0x0,          /**< Reference to HAL nvic WWDG_IRQn */
+        FMKCPU_NVIC_WWDG_IRQN = 0,          /**< Reference to HAL nvic WWDG_IRQn */
         FMKCPU_NVIC_PVD_PVM_IRQN,             /**< Reference to HAL nvic PVD_PVM_IRQn */
         FMKCPU_NVIC_RTC_TAMP_LSECSS_IRQN,     /**< Reference to HAL nvic RTC_TAMP_LSECSS_IRQn */
         FMKCPU_NVIC_RTC_WKUP_IRQN,            /**< Reference to HAL nvic RTC_WKUP_IRQn */
@@ -325,7 +325,7 @@
     */
     typedef enum
     {
-        FMKCPU_DMA_RQSTYPE_ADC1 = 0x0,               /**< Reference to Bsp Dma Request for ADC1 */
+        FMKCPU_DMA_RQSTYPE_ADC1 = 0,               /**< Reference to Bsp Dma Request for ADC1 */
         FMKCPU_DMA_RQSTYPE_ADC2,                     /**< Reference to Bsp Dma Request for ADC2 */
         FMKCPU_DMA_RQSTYPE_ADC3,                     /**< Reference to Bsp Dma Request for ADC3 */
         FMKCPU_DMA_RQSTYPE_ADC4,                     /**< Reference to Bsp Dma Request for ADC4 */
@@ -346,7 +346,7 @@
     */
     typedef enum
     {
-        FMKCPU_DMA_CTRL_1 = 0x0,                  /**< Reference to DMA 1 */
+        FMKCPU_DMA_CTRL_1 = 0,                  /**< Reference to DMA 1 */
         FMKCPU_DMA_CTRL_2,                        /**< Reference to DMA 2 */
     
         FMKCPU_DMA_CTRL_NB,
@@ -357,7 +357,7 @@
     */
     typedef enum
     {
-        FMKCPU_DMA_CHANNEL_1 = 0x0,                  /**< Reference to Channel 1 */
+        FMKCPU_DMA_CHANNEL_1 = 0,                  /**< Reference to Channel 1 */
         FMKCPU_DMA_CHANNEL_2,                        /**< Reference to Channel 2 */
         FMKCPU_DMA_CHANNEL_3,                        /**< Reference to Channel 3 */
         FMKCPU_DMA_CHANNEL_4,                        /**< Reference to Channel 4 */
@@ -374,7 +374,7 @@
     */
     typedef enum
     {
-        FMKCPU_DMA_MUX_1 = 0x0,                  /**< Reference to DMAMUX 1 */
+        FMKCPU_DMA_MUX_1 = 0,                  /**< Reference to DMAMUX 1 */
     
         FMKCPU_DMA_MUX_NB,
     } t_eFMKCPU_DmaMux;
@@ -394,32 +394,6 @@
     } t_uFMKCPU_DmaHandleType;
 
     //-----------------------------STRUCT TYPES---------------------------//
-    typedef enum 
-    {
-        FMKCPU_DMA_ERRSTATE_OK = 0x000U,                     /**< No error detected */
-        FMKCPU_DMA_ERRSTATE_TRANSFER_COMPLETE = 0x001,       /**< THe transfer is completed with an error */
-        FMKCPU_DMA_ERRSTATE_TRANSFER_ERROR = 0x002,          /**< THe transfer is incomplete with an error */
-        FMKCPU_DMA_ERRSTATE_FIFO = 0x004,                    /**< FIFO error, over/under debit from FIFO to DMA */
-        FMKCPU_DMA_ERRSTATE_DIRECT_MODE = 0x008,             /**< An error with direct mode DMA has been detected*/
-        FMKCPU_DMA_ERRSTATE_INVALID_CHANNEL = 0x010,         /**< DMA cannal invalid */
-        FMKCPU_DMA_ERRSTATE_CONFIGURATION = 0x020,           /**< A configuration error has been detected */
-        FMKCPU_DMA_ERRSTATE_PRIORITY = 0x040,                /**< Priority DMA has not been respected */
-        FMKCPU_DMA_ERRSTATE_MEM_ALLOCATION = 0x080,          /**< Error allocation memory (FIFO not allowed) */
-        FMKCPU_DMA_ERRSTATE_TIMEOUT = 0x100                  /**< Timeout delay (transfer has take too many time)*/
-    } t_eFMKCPU_DmaChnlErr;
-    typedef struct
-    {
-        DMA_HandleTypeDef bspDma_ps;            /**< @ref  DMA_HandleTypeDef*/
-        const t_eFMKCPU_IRQNType c_IRQNType_e;                   /**< NVIC channel interruption config*/
-        t_eFMKCPU_DmaChnlErr chnlErr_e;         /**< @ref t_eFMKCPU_DmaChnlErr*/
-        t_bool isChnlConfigured_b;
-    } t_sFMKCPU_DmaChnlInfo;
-
-    typedef struct 
-    {
-        t_sFMKCPU_DmaChnlInfo channel_as[FMKCPU_DMA_CHANNEL_NB];        /**< @ref  t_sFMKCPU_DmaChnlInfo*/
-        const t_eFMKCPU_ClockPort c_clock_e;                              /**< constant to store the clock for each ADC */                                         /**< Flag channel is configured */
-    } t_sFMKCPU_DmaInfo;
     // ********************************************************************
     // *                      Prototypes
     // ********************************************************************
