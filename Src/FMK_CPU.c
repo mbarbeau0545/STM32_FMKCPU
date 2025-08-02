@@ -13,9 +13,10 @@
 // ********************************************************************
 #include "./FMK_CPU.h"
 #include "FMK_CFG/FMKCFG_ConfigFiles/FMKCPU_ConfigPrivate.h"
+
 #include "Constant.h"
 #include "APP_CTRL/APP_SYS/Src/APP_SYS.h"
-
+#include "3_APP/APP_CTRL/APP_SDM/Src/APP_SDM.h"
 #include "Library/SafeMem/SafeMem.h"
 // ********************************************************************
 // *                      Defines
@@ -30,16 +31,20 @@
 //-----------------------------ENUM TYPES-----------------------------//
 typedef enum 
 {
-    FMKCPU_DMA_ERRSTATE_OK = 0x000U,                     /**< No error detected */
-    FMKCPU_DMA_ERRSTATE_TRANSFER_COMPLETE = 0x001,       /**< THe transfer is completed with an error */
-    FMKCPU_DMA_ERRSTATE_TRANSFER_ERROR = 0x002,          /**< THe transfer is incomplete with an error */
-    FMKCPU_DMA_ERRSTATE_FIFO = 0x004,                    /**< FIFO error, over/under debit from FIFO to DMA */
-    FMKCPU_DMA_ERRSTATE_DIRECT_MODE = 0x008,             /**< An error with direct mode DMA has been detected*/
-    FMKCPU_DMA_ERRSTATE_INVALID_CHANNEL = 0x010,         /**< DMA cannal invalid */
-    FMKCPU_DMA_ERRSTATE_CONFIGURATION = 0x020,           /**< A configuration error has been detected */
-    FMKCPU_DMA_ERRSTATE_PRIORITY = 0x040,                /**< Priority DMA has not been respected */
-    FMKCPU_DMA_ERRSTATE_MEM_ALLOCATION = 0x080,          /**< Error allocation memory (FIFO not allowed) */
-    FMKCPU_DMA_ERRSTATE_TIMEOUT = 0x100                  /**< Timeout delay (transfer has take too many time)*/
+    FMKCPU_DMA_ERRSTATE_OK = 0,                  /**< No error detected */
+    FMKCPU_DMA_ERRSTATE_TRANSFER_COMPLETE,       /**< THe transfer is completed with an error */
+    FMKCPU_DMA_ERRSTATE_TRANSFER_ERROR,          /**< THe transfer is incomplete with an error */
+    FMKCPU_DMA_ERRSTATE_FIFO,                    /**< FIFO error, over/under debit from FIFO to DMA */
+    FMKCPU_DMA_ERRSTATE_XFER,                    /**< Abort request with Xfer on going */
+    FMKCPU_DMA_ERRSTATE_NOT_SUPPORTED,           /**< Not supported mode */
+    FMKCPU_DMA_ERRSTATE_DIRECT_MODE,             /**< An error with direct mode DMA has been detected*/
+    FMKCPU_DMA_ERRSTATE_SYNC,                    /**< DMAMUX Sync overrun */
+    FMKCPU_DMA_ERRSTATE_REQGEN,                  /**< request generator vverrun */
+    FMKCPU_DMA_ERRSTATE_INVALID_CHANNEL,         /**< DMA cannal invalid */
+    FMKCPU_DMA_ERRSTATE_CONFIGURATION,           /**< A configuration error has been detected */
+    FMKCPU_DMA_ERRSTATE_PRIORITY,                /**< Priority DMA has not been respected */
+    FMKCPU_DMA_ERRSTATE_MEM_ALLOCATION,          /**< Error allocation memory (FIFO not allowed) */
+    FMKCPU_DMA_ERRSTATE_TIMEOUT                  /**< Timeout delay (transfer has take too many time)*/
 } t_eFMKCPU_DmaChnlErr;
 //-----------------------------TYPEDEF TYPES---------------------------//
 typedef struct
@@ -48,6 +53,7 @@ typedef struct
     t_eFMKCPU_IRQNType c_IRQNType_e;                   /**< NVIC channel interruption config*/
     t_eFMKCPU_DmaChnlErr chnlErr_e;         /**< @ref t_eFMKCPU_DmaChnlErr*/
     t_bool isChnlConfigured_b;
+    t_bool ErrorDetected_b;
 } t_sFMKCPU_DmaChnlInfo;
 
 typedef struct 
@@ -187,8 +193,24 @@ static t_eReturnCode s_FMKCPU_LinkDma(  t_eFMKCPU_DmaType f_DmaType_e,
 *  @retval RC_ERROR_PARAM_NOT_SUPPORTED      @ref RC_ERROR_PARAM_NOT_SUPPORTED
 *
 */
-static t_eReturnCode s_FMKCPU_Get_DmaBspPriority(t_eFMKCPU_DmaTransferPriority f_priority_e, t_uint32 * f_bspPriority_pu32);
-
+static t_eReturnCode s_FMKCPU_Get_DmaBspPriority(   t_eFMKCPU_DmaTransferPriority f_priority_e, 
+                                                    t_uint32 * f_bspPriority_pu32);
+/**
+*
+*	@brief      Function to get the bsp dma priority
+*
+*	@param[in]  f_channel_e              : enum value for the channel, value from @ref t_eFMKCPU_InterruptChnl
+*	@param[in]  f_bspPriority_pu32       : storage for bsp prioirty.\n
+*
+*  @retval RC_OK                             @ref RC_OK
+*  @retval RC_ERROR_PARAM_INVALID            @ref RC_ERROR_PARAM_INVALID
+*  @retval RC_ERROR_PTR_NULL                 @ref RC_ERROR_PTR_NULL
+*  @retval RC_ERROR_PARAM_NOT_SUPPORTED      @ref RC_ERROR_PARAM_NOT_SUPPORTED
+*
+*/
+static t_eReturnCode s_FMKCPU_DmaPerformDiagnostic( t_eFMKCPU_DmaController f_dmaCtrl_e, 
+                                                    t_eFMKCPU_DmaChnl f_dmaChnl_e,
+                                                    t_uint32  f_bspError_u32);
 //****************************************************************************
 //                      Public functions - Implementation
 //********************************************************************************
@@ -211,6 +233,7 @@ t_eReturnCode FMKCPU_Init(void)
                 (DMA_Channel_TypeDef *)c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].Instance;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].isChnlConfigured_b = (t_bool)False;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].chnlErr_e = FMKCPU_DMA_ERRSTATE_OK;
+            g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].ErrorDetected_b = (t_bool)FALSE;
         }
 
         g_DmaCtrlState_ae[idxDma_u8] = FMKCPU_CLOCKPORT_OPE_DISABLE;
@@ -1096,10 +1119,39 @@ DMA_HandleTypeDef * FMKCPU_PRIVATE_GetHandleTypeDef(t_eFMKCPU_DmaController f_dm
  *********************************/
 static t_eReturnCode s_FMKCPU_Operational(void)
 {
-    t_eReturnCode Ret_e = RC_OK;
+    t_eReturnCode Ret_e;
+    t_uint8 idxDma_u8;
+    t_uint8 idxDmaChnl_u8;
+    t_sFMKCPU_DmaChnlInfo * dmaChnlInfo_ps;
+    t_uint32 bspError_u32;
+
+    for(idxDma_u8 = (t_uint8)0 ; idxDma_u8 < FMKCPU_DMA_CTRL_NB ; idxDma_u8++)
+    {
+        for(idxDmaChnl_u8 = (t_uint8)0 ; idxDmaChnl_u8 < FMKCPU_DMA_CHANNEL_NB ; idxDmaChnl_u8++)
+        {
+            dmaChnlInfo_ps = (t_sFMKCPU_DmaChnlInfo *)(&g_DmaInfo_as[idxDma_u8].channel_as[idxDmaChnl_u8]);
+            if(dmaChnlInfo_ps->isChnlConfigured_b == (t_bool)TRUE)
+            {
+                bspError_u32 = HAL_DMA_GetError(&dmaChnlInfo_ps->bspDma_s);
+
+                if((bspError_u32 != HAL_DMA_ERROR_NONE)
+                || (dmaChnlInfo_ps->ErrorDetected_b == (t_bool)TRUE))
+                {
+                    if(dmaChnlInfo_ps->ErrorDetected_b == (t_bool)FALSE)
+                    {
+                        dmaChnlInfo_ps->ErrorDetected_b = (t_bool)TRUE;
+                    }
+
+                    Ret_e = s_FMKCPU_DmaPerformDiagnostic(idxDma_u8, idxDmaChnl_u8, bspError_u32);
+                }
+            }
+        }
+    }
+
     
     return Ret_e;
 }
+
 /*********************************
  * s_FMKCPU_Get_BspNVICPriority
  *********************************/
@@ -1140,7 +1192,75 @@ static t_eReturnCode s_FMKCPU_Get_BspNVICPriority(t_eFMKCPU_NVICPriority f_prior
     return Ret_e;
 }
 
+/*********************************
+ * s_FMKCPU_DmaPerformDiagnostic
+ *********************************/
+static t_eReturnCode s_FMKCPU_DmaPerformDiagnostic( t_eFMKCPU_DmaController f_dmaCtrl_e, 
+                                                    t_eFMKCPU_DmaChnl f_dmaChnl_e,
+                                                    t_uint32  f_bspError_u32)
+{
+    t_eReturnCode Ret_e;
+    t_uint16 diagInfo1_u16;
+    t_sFMKCPU_DmaChnlInfo * dmaChnlInfo_ps;
+    t_uint32 currentTime_u32;
 
+    if((f_dmaCtrl_e >= FMKCPU_DMA_CTRL_NB)
+    || (f_dmaChnl_e >= FMKCPU_DMA_CHANNEL_NB))
+    {
+        Ret_e = RC_ERROR_PARAM_INVALID;
+    }
+    else 
+    {
+        Ret_e = RC_OK;
+        diagInfo1_u16 = (t_uint16)(f_dmaCtrl_e << (t_uint8)8 | (t_uint8)f_dmaChnl_e);
+        FMKCPU_GetTick(&currentTime_u32);
+        dmaChnlInfo_ps = (t_sFMKCPU_DmaChnlInfo *)(&g_DmaInfo_as[f_dmaCtrl_e].channel_as[f_dmaChnl_e]);
+
+        switch(f_bspError_u32)
+        {
+            case HAL_DMA_ERROR_NONE:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_OK;
+            break;
+            case HAL_DMA_ERROR_TE:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_TRANSFER_ERROR;
+            break;
+            case HAL_DMA_ERROR_NO_XFER:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_XFER;
+            break;
+            case HAL_DMA_ERROR_TIMEOUT:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_TIMEOUT;
+            break;
+            case HAL_DMA_ERROR_NOT_SUPPORTED:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_NOT_SUPPORTED;
+            break;
+            case HAL_DMA_ERROR_SYNC:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_SYNC;
+            break;
+            case HAL_DMA_ERROR_REQGEN:
+                dmaChnlInfo_ps->chnlErr_e = FMKCPU_DMA_ERRSTATE_REQGEN;
+            break;
+            default:
+            break;
+        }
+        if(dmaChnlInfo_ps->chnlErr_e != FMKCPU_DMA_ERRSTATE_OK)
+        {
+            APPSDM_ReportDiagEvnt(  APPSDM_DIAG_ITEM_FMK_CPU_OPE_ERROR,
+                                    APPSDM_DIAG_ITEM_REPORT_FAIL,
+                                    (t_uint16)diagInfo1_u16,
+                                    (t_uint16)dmaChnlInfo_ps->chnlErr_e);
+        }
+        else 
+        {
+            dmaChnlInfo_ps->ErrorDetected_b = (t_bool)FALSE;
+            APPSDM_ReportDiagEvnt(  APPSDM_DIAG_ITEM_FMK_CPU_OPE_ERROR,
+                                    APPSDM_DIAG_ITEM_REPORT_PASS,
+                                    (t_uint16)diagInfo1_u16,
+                                    (t_uint16)0);
+        }
+    }
+
+    return Ret_e;
+}
 /******************************************
  * BSP CALLBACK IMPLEMENTATION
  *****************************************/
