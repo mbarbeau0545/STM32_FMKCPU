@@ -83,15 +83,20 @@ t_eFMKCPU_ClockPortOpe g_DmaCtrlState_ae[FMKCPU_DMA_CTRL_NB];
 
 static t_eCyclicModState g_FmkCpu_ModState_e = STATE_CYCLIC_CFG;
 
-WWDG_HandleTypeDef g_wwdgInfos_s = {0};
+IWDG_HandleTypeDef g_iwdgInfos_s = {0};
 
 t_uint8 g_SysClockValue_ua8[FMKCPU_SYS_CLOCK_NB];
-
-t_bool g_IsSysClkInit_b = (t_bool)False;
-
+t_eFMKCPU_CpuResetFlag g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_NONE;
+t_bool g_IsSysClkInit_b = (t_bool)FALSE;
+t_bool g_isWwgInit_b = (t_bool)FALSE;
 //********************************************************************************
 //                      Local functions - Prototypes
 //********************************************************************************
+/**
+ *
+ *	@brief      Perform all cyclic operatiDiagnostic purpose to know why the Cpu has reset.
+ */
+static void s_FMKCPU_CheckResetCpuFlag(void);
 /**
  *
  *	@brief      Perform all cyclic operation
@@ -258,6 +263,7 @@ t_eReturnCode FMKCPU_Cyclic(void)
     {
         case STATE_CYCLIC_CFG:
         {
+            (void)s_FMKCPU_CheckResetCpuFlag();
             g_FmkCpu_ModState_e = STATE_CYCLIC_WAITING;
             break;
         }
@@ -420,17 +426,19 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         bspOscCfg_ps = (t_sFMKCPU_SysOscCfg *)&c_FmkCpu_SysOscCfg_as[f_SystemCoreFreq_e];
 
 #ifdef FMKCPU_STM32_ECU_FAMILY_G
-
-        RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;               // 16 MHz
+        //---- for system ----//
+        RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSI ;               // 16 MHz
         RCC_OscInitStruct.HSIState = RCC_HSI_ON;
         RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
         RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                             // use divider and stuff
+        RCC_OscInitStruct.LSIState = RCC_LSI_ON;
         RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;                     // use HSI as PLL source clock
         RCC_OscInitStruct.PLL.PLLM = bspOscCfg_ps->PLLM_Divider_u32;             // Divided the HSI clock sources
         RCC_OscInitStruct.PLL.PLLN = bspOscCfg_ps->PPLN_Multplier_u32;           // Multiplied the HSI clock sources
         RCC_OscInitStruct.PLL.PLLP = bspOscCfg_ps->PLLP_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLP clock source    
         RCC_OscInitStruct.PLL.PLLQ = bspOscCfg_ps->PPLQ_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLQ clock source    
         RCC_OscInitStruct.PLL.PLLR = bspOscCfg_ps->PLLR_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLCLK (SYSCLK) clock sources
+        
 
         bspRet_e = HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
         
@@ -649,27 +657,35 @@ t_eReturnCode FMKCPU_Set_HwClock(t_eFMKCPU_ClockPort f_clkPort_e,
  *********************************/
 t_eReturnCode FMKCPU_Set_WwdgCfg(t_eFMKCPu_WwdgResetPeriod f_period_e)
 {
-    t_eReturnCode Ret_e = RC_OK;
-    HAL_StatusTypeDef bspRet_e = HAL_OK;
+    t_eReturnCode Ret_e;
+    HAL_StatusTypeDef bspRet_e;
 
-    Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_WWDG, FMKCPU_CLOCKPORT_OPE_ENABLE);
-    if(Ret_e == RC_OK)
+    if(g_IsSysClkInit_b == (t_bool)FALSE)
     {
-        Ret_e = FMKCPU_Set_NVICState(FMKCPU_NVIC_WWDG_IRQN ,FMKCPU_NVIC_OPE_ENABLE);
+        ASSERT((t_uint16)0);
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
     }
-    if(Ret_e == RC_OK)
+    else
     {
-        g_wwdgInfos_s.Instance       = WWDG;
-        g_wwdgInfos_s.Init.Prescaler = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].psc_u16;
-        g_wwdgInfos_s.Init.Counter   = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].reload_u16;
-        g_wwdgInfos_s.Init.Window    = (t_uint32)0x0FFF;
-        g_wwdgInfos_s.Init.EWIMode   = WWDG_EWI_ENABLE;
-        bspRet_e = HAL_WWDG_Init(&g_wwdgInfos_s);
+        g_iwdgInfos_s.Instance = IWDG;
+        //---- LSE oscillator is 32 KHz -----//
+        g_iwdgInfos_s.Init.Prescaler = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].psc_u16;
+        g_iwdgInfos_s.Init.Reload    = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].reload_u16;
+        g_iwdgInfos_s.Init.Window    = IWDG_WINDOW_DISABLE;
 
+        
+        bspRet_e = HAL_IWDG_Init(&g_iwdgInfos_s);
         if(bspRet_e != HAL_OK)
         {
             Ret_e = RC_ERROR_WRONG_STATE;
             ASSERT((t_uint16)Ret_e);
+        }
+        else 
+        {
+            //---- enable to freeze the watchdog in debug ----//
+            __HAL_DBGMCU_FREEZE_IWDG();
+            Ret_e = RC_OK;
+            g_isWwgInit_b = (t_bool)TRUE;
         }
     }
 
@@ -677,22 +693,28 @@ t_eReturnCode FMKCPU_Set_WwdgCfg(t_eFMKCPu_WwdgResetPeriod f_period_e)
 }
 
 /*********************************
- * FMKCPU_ResetWwdg
+ * FMKCPU_RearmWwdg
  *********************************/
-t_eReturnCode FMKCPU_ResetWwdg(void)
+void FMKCPU_RearmWwdg(void)
 {
     HAL_StatusTypeDef bspRet_e = HAL_OK;
-    t_eReturnCode Ret_e = RC_OK;
-    bspRet_e = HAL_WWDG_Refresh(&g_wwdgInfos_s);
 
-    if(bspRet_e != HAL_OK)
+    if((g_IsSysClkInit_b == (t_bool)FALSE)
+    || (g_isWwgInit_b == (t_bool)FALSE))
     {
-        Ret_e = RC_ERROR_WRONG_RESULT;
-        ASSERT((t_uint16)Ret_e);
+        ASSERT((t_uint16)g_isWwgInit_b);
     }
-    return Ret_e;
-}
+    else
+    {
+        bspRet_e = HAL_IWDG_Refresh(&g_iwdgInfos_s);
 
+        if(bspRet_e != HAL_OK)
+        {
+            ASSERT((t_uint16)bspRet_e);
+        }
+    }
+    return;
+}
 /***********************************
  * FMKCPU_RqstDmaInit
  ***********************************/
@@ -716,6 +738,7 @@ t_eReturnCode FMKCPU_RqstDmaInit(   t_eFMKCPU_DmaRqst f_DmaRqstType,
         Ret_e = RC_ERROR_PTR_NULL;
         ASSERT((t_uint16)Ret_e);
     }
+    
     if(Ret_e == RC_OK)
     {
         //--------- Reach Information ---------//
@@ -837,6 +860,52 @@ t_eReturnCode FMKCPU_GetSysClkValue(    t_eFMKCPU_SysClkOsc f_ClkOsc_e,
 //********************************************************************************
 //                      Local functions - Implementation
 //********************************************************************************
+/*********************************
+ * s_FMKCPU_CheckResetCpuFlag
+ *********************************/
+static void s_FMKCPU_CheckResetCpuFlag(void)
+{
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_OBLRST;
+        FMKSRL_LOG("[RESET] Option Byte Loader Reset (OBLRST)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_PINRST;
+        FMKSRL_LOG("[RESET] External Reset Pin (PINRST)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_BORRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_BORRST;
+        FMKSRL_LOG("[RESET] Power-On Reset (Brown-out reset)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_SFRST;
+        FMKSRL_LOG("[RESET] Software Reset (SFTRST)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_IWDRST;
+        FMKSRL_LOG("[RESET] Independent Watchdog Reset (IWDGRST)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_WWDRST;
+        FMKSRL_LOG("[RESET] Window Watchdog Reset (WWDGRST)\n");
+    }
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_LPWRRST;
+        FMKSRL_LOG("[RESET] Low Power Reset (LPWRRST)\n");
+    }
+
+    // Efface tous les flags une fois lus
+    __HAL_RCC_CLEAR_RESET_FLAGS();
+
+    return;
+}
 /***********************************
  * s_FMKCPU_SetDmaHwInit
  ***********************************/
@@ -1277,13 +1346,13 @@ void SysTick_Handler(void) { return HAL_IncTick(); }
  ***********************************/
 void WWDG_IRQHandler(void)
 {
-    if (g_wwdgInfos_s.Instance->SR & WWDG_SR_EWIF)
-    {
-        // Effacer le drapeau d'interruption précoce
-        g_wwdgInfos_s.Instance->SR &= ~WWDG_SR_EWIF;
-
-        // deal with error
-    }
+    //if (g_wwdgInfos_s.Instance->SR & WWDG_SR_EWIF)
+    //{
+    //    // Effacer le drapeau d'interruption précoce
+    //    g_wwdgInfos_s.Instance->SR &= ~WWDG_SR_EWIF;
+//
+    //    // deal with error
+    //}
 }
 //************************************************************************************
 // End of File

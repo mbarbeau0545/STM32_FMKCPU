@@ -201,7 +201,7 @@
     *  @retval RC_OK                             @ref RC_OK
     *  @retval RC_ERROR_WRONG_STATE              @ref RC_ERROR_WRONG_STATE
     */
-    t_eReturnCode FMKCPU_ResetWwdg(void);
+    void FMKCPU_RearmWwdg(void);
     /**
     *
     *	@brief
