@@ -119,7 +119,7 @@ static t_eReturnCode s_FMKCPU_Operational(void);
  *  @retval RC_ERROR_WRONG_STATE              @ref RC_ERROR_WRONG_STATE
 
  */
-//static t_eReturnCode s_FMKCPU_PerformDiagnostic(void);
+//static t_eReturnCode s_FMKCPU_PerformDmaDiagnostic(void);
 /**
  *
  *	@brief      Function to get the bsp NVIC priority init
@@ -213,9 +213,21 @@ static t_eReturnCode s_FMKCPU_Get_DmaBspPriority(   t_eFMKCPU_DmaTransferPriorit
 *  @retval RC_ERROR_PARAM_NOT_SUPPORTED      @ref RC_ERROR_PARAM_NOT_SUPPORTED
 *
 */
-static t_eReturnCode s_FMKCPU_DmaPerformDiagnostic( t_eFMKCPU_DmaController f_dmaCtrl_e, 
+static t_eReturnCode s_FMKCPU_DmaDiagMngmt( t_eFMKCPU_DmaController f_dmaCtrl_e, 
                                                     t_eFMKCPU_DmaChnl f_dmaChnl_e,
                                                     t_uint32  f_bspError_u32);
+/**
+*
+*	@brief      Perform Diagnostic on Dma and Dma Channel
+*
+*/
+static t_eReturnCode s_FMKCPU_PerformDmaDiagnostic(void);
+/**
+*
+*	@brief      Perform Diagnostic on Temperature Cpu and Supply voltage
+*
+*/
+static t_eReturnCode s_FMKCPU_PerformCpuDiagnostic(void);
 //****************************************************************************
 //                      Public functions - Implementation
 //********************************************************************************
@@ -1189,34 +1201,13 @@ DMA_HandleTypeDef * FMKCPU_PRIVATE_GetHandleTypeDef(t_eFMKCPU_DmaController f_dm
 static t_eReturnCode s_FMKCPU_Operational(void)
 {
     t_eReturnCode Ret_e;
-    t_uint8 idxDma_u8;
-    t_uint8 idxDmaChnl_u8;
-    t_sFMKCPU_DmaChnlInfo * dmaChnlInfo_ps;
-    t_uint32 bspError_u32;
+    
+    Ret_e = s_FMKCPU_PerformDmaDiagnostic();
 
-    for(idxDma_u8 = (t_uint8)0 ; idxDma_u8 < FMKCPU_DMA_CTRL_NB ; idxDma_u8++)
+    if(Ret_e >= RC_OK)
     {
-        for(idxDmaChnl_u8 = (t_uint8)0 ; idxDmaChnl_u8 < FMKCPU_DMA_CHANNEL_NB ; idxDmaChnl_u8++)
-        {
-            dmaChnlInfo_ps = (t_sFMKCPU_DmaChnlInfo *)(&g_DmaInfo_as[idxDma_u8].channel_as[idxDmaChnl_u8]);
-            if(dmaChnlInfo_ps->isChnlConfigured_b == (t_bool)TRUE)
-            {
-                bspError_u32 = HAL_DMA_GetError(&dmaChnlInfo_ps->bspDma_s);
-
-                if((bspError_u32 != HAL_DMA_ERROR_NONE)
-                || (dmaChnlInfo_ps->ErrorDetected_b == (t_bool)TRUE))
-                {
-                    if(dmaChnlInfo_ps->ErrorDetected_b == (t_bool)FALSE)
-                    {
-                        dmaChnlInfo_ps->ErrorDetected_b = (t_bool)TRUE;
-                    }
-
-                    Ret_e = s_FMKCPU_DmaPerformDiagnostic(idxDma_u8, idxDmaChnl_u8, bspError_u32);
-                }
-            }
-        }
+        Ret_e = s_FMKCPU_PerformCpuDiagnostic();
     }
-
     
     return Ret_e;
 }
@@ -1262,9 +1253,104 @@ static t_eReturnCode s_FMKCPU_Get_BspNVICPriority(t_eFMKCPU_NVICPriority f_prior
 }
 
 /*********************************
- * s_FMKCPU_DmaPerformDiagnostic
+ * s_FMKCPU_PerformDmaDiagnostic
  *********************************/
-static t_eReturnCode s_FMKCPU_DmaPerformDiagnostic( t_eFMKCPU_DmaController f_dmaCtrl_e, 
+static t_eReturnCode s_FMKCPU_PerformDmaDiagnostic(void)
+{
+    t_eReturnCode Ret_e;
+    t_uint8 idxDma_u8;
+    t_uint8 idxDmaChnl_u8;
+    t_sFMKCPU_DmaChnlInfo * dmaChnlInfo_ps;
+    t_uint32 bspError_u32;
+
+    Ret_e = RC_OK;
+    for(idxDma_u8 = (t_uint8)0 ; idxDma_u8 < FMKCPU_DMA_CTRL_NB ; idxDma_u8++)
+    {
+        for(idxDmaChnl_u8 = (t_uint8)0 ; idxDmaChnl_u8 < FMKCPU_DMA_CHANNEL_NB ; idxDmaChnl_u8++)
+        {
+            dmaChnlInfo_ps = (t_sFMKCPU_DmaChnlInfo *)(&g_DmaInfo_as[idxDma_u8].channel_as[idxDmaChnl_u8]);
+            if(dmaChnlInfo_ps->isChnlConfigured_b == (t_bool)TRUE)
+            {
+                bspError_u32 = HAL_DMA_GetError(&dmaChnlInfo_ps->bspDma_s);
+
+                if((bspError_u32 != HAL_DMA_ERROR_NONE)
+                || (dmaChnlInfo_ps->ErrorDetected_b == (t_bool)TRUE))
+                {
+                    if(dmaChnlInfo_ps->ErrorDetected_b == (t_bool)FALSE)
+                    {
+                        dmaChnlInfo_ps->ErrorDetected_b = (t_bool)TRUE;
+                    }
+
+                    Ret_e = s_FMKCPU_DmaDiagMngmt(idxDma_u8, idxDmaChnl_u8, bspError_u32);
+                }
+            }
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * s_FMKCPU_DmaDiagMngmt
+ *********************************/
+static t_eReturnCode s_FMKCPU_PerformCpuDiagnostic(void)
+{
+    t_eReturnCode Ret_e;
+    t_float32 anaMeasure_f32 = 0.0f;
+
+    if(FMKPCU_ADC_INTERN_SNS_TEMP != FMKCDA_ADC_INTERN_NB)
+    {
+        Ret_e = FMKCDA_Get_AnaInternSnsMeasure(FMKPCU_ADC_INTERN_SNS_TEMP, &anaMeasure_f32);
+        if(Ret_e == RC_OK)
+        {
+            if((anaMeasure_f32 > (t_float32)FMKCPU_CPU_TEMP_TRESHOLD_MAX)
+            || (anaMeasure_f32 < (t_float32)FMKCPU_CPU_TEMP_TRESHOLD_MIN))
+            {
+                APPSDM_ReportDiagEvnt(APPSDM_DIAG_ITEM_FMK_CPU_TEMP_OUT_OF_RANGE,
+                                        APPSDM_DIAG_ITEM_REPORT_FAIL,
+                                        (t_uint16)anaMeasure_f32,
+                                        (t_uint16)0);
+            }
+            else 
+            {
+                APPSDM_ReportDiagEvnt(APPSDM_DIAG_ITEM_FMK_CPU_TEMP_OUT_OF_RANGE,
+                                        APPSDM_DIAG_ITEM_REPORT_PASS,
+                                        (t_uint16)0,
+                                        (t_uint16)0);
+            }
+        }
+        
+    }
+    if(FMKPCU_ADC_INTERN_SNS_VBAT != FMKCDA_ADC_INTERN_NB)
+    {
+        anaMeasure_f32 = 0.0f;
+        Ret_e = FMKCDA_Get_AnaInternSnsMeasure(FMKPCU_ADC_INTERN_SNS_VBAT, &anaMeasure_f32);
+        if(Ret_e == RC_OK)
+        {
+            if((anaMeasure_f32 > (t_float32)FMKCPU_VBAT_TRESHOLD_MAX)
+            || (anaMeasure_f32 < (t_float32)FMKCPU_VBAT_TRESHOLD_MIN))
+            {
+                APPSDM_ReportDiagEvnt(APPSDM_DIAG_ITEM_FMK_SUPPLY_VOLTAGE_OUT_OF_RANGE,
+                                        APPSDM_DIAG_ITEM_REPORT_FAIL,
+                                        (t_uint16)(anaMeasure_f32 * 10),
+                                        (t_uint16)0);
+            }
+            else 
+            {
+                APPSDM_ReportDiagEvnt(APPSDM_DIAG_ITEM_FMK_SUPPLY_VOLTAGE_OUT_OF_RANGE,
+                                        APPSDM_DIAG_ITEM_REPORT_PASS,
+                                        (t_uint16)0,
+                                        (t_uint16)0);
+            }
+        }   
+    }
+
+    return Ret_e;
+}
+/*********************************
+ * s_FMKCPU_DmaDiagMngmt
+ *********************************/
+static t_eReturnCode s_FMKCPU_DmaDiagMngmt( t_eFMKCPU_DmaController f_dmaCtrl_e, 
                                                     t_eFMKCPU_DmaChnl f_dmaChnl_e,
                                                     t_uint32  f_bspError_u32)
 {

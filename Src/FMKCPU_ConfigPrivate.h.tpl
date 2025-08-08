@@ -1,4 +1,4 @@
-/*********************************************************************
+    /*********************************************************************
  * @file        FMKCPU_ConfigPrivate.h
  * @brief       Template_BriefDescription.
  * @note        TemplateDetailsDescription.\n
@@ -19,11 +19,24 @@
     // *                      Includes
     // ********************************************************************
     #include "../FMKCFG_ConfigSpecific/FMKCPU_ConfigSpecific.h"
+    #include "FMK_HAL/FMK_CDA/Src/FMK_CDA.h"
     #include "TypeCommon.h"
     // ********************************************************************
     // *                      Defines
     // ********************************************************************
-    
+    ///@brief supply voltage and temp Cpu monitoring, put FMKCDA_ADC_INTERN_NB
+    ///         if the intern sens does not exist.
+    #define FMKPCU_ADC_INTERN_SNS_VBAT (FMKCDA_ADC_INTERN_VBAT)
+    #define FMKPCU_ADC_INTERN_SNS_TEMP (FMKCDA_ADC_INTERN_TS_CAL1)
+
+    ///@brief max/min treshold for vbatterie 
+    #define FMKCPU_VBAT_TRESHOLD_MIN ((t_float32)2900.0f) // mV
+    #define FMKCPU_VBAT_TRESHOLD_MAX ((t_float32)3500.0f) // mV
+
+    ///@brief max/min treshold for Temperature
+    #define FMKCPU_CPU_TEMP_TRESHOLD_MIN    ((t_float32)-10.0f)
+    #define FMKCPU_CPU_TEMP_TRESHOLD_MAX    ((t_float32)110.0f)
+
     // ********************************************************************
     // *                      Types
     // ********************************************************************
@@ -167,10 +180,10 @@
     /**< Hardware configuration watchdog Period Timer */
     const t_sFMKCPU_BspWwdgCfg c_FMKCPU_WwdgPeriodcfg_ua16[FMKCPU_WWDG_RESET_NB] = {
         // prescaler value         reload value
-        {WWDG_PRESCALER_1,          98}, // FMKCPU_WWDG_RESET_50MS
-        {WWDG_PRESCALER_2,          98}, // FMKCPU_WWDG_RESET_100MS
-        {WWDG_PRESCALER_4,          98}, // FMKCPU_WWDG_RESET_200MS
-        {WWDG_PRESCALER_8,          122},// FMKCPU_WWDG_RESET_500MS
+        {IWDG_PRESCALER_32,          49}, // FMKCPU_WWDG_RESET_50MS
+        {IWDG_PRESCALER_32,          99}, // FMKCPU_WWDG_RESET_100MS
+        {IWDG_PRESCALER_32,          199}, // FMKCPU_WWDG_RESET_200MS
+        {IWDG_PRESCALER_32,          499},// FMKCPU_WWDG_RESET_500MS
     };
 
     /* CAUTION : Automatic generated code section for Variable: Start */
@@ -324,7 +337,7 @@
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  SPI3_IRQn
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  UART4_IRQn
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  UART5_IRQn
-        FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  TIM6_DAC_IRQn
+        FMKCPU_NVIC_PRIORITY_HIGH,                        //  TIM6_DAC_IRQn
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  TIM7_DAC_IRQn
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  DMA2_Channel1_IRQn
         FMKCPU_NVIC_PRIORITY_MEDIUM,                      //  DMA2_Channel2_IRQn
@@ -512,6 +525,8 @@
         {FMKCPU_DMA_CTRL_1,             FMKCPU_DMA_CHANNEL_7,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_USART1_TX
         {FMKCPU_DMA_CTRL_1,             FMKCPU_DMA_CHANNEL_2,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_USART2_RX
         {FMKCPU_DMA_CTRL_1,             FMKCPU_DMA_CHANNEL_1,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_USART2_TX
+        {FMKCPU_DMA_CTRL_2,             FMKCPU_DMA_CHANNEL_6,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_USART3_RX
+        {FMKCPU_DMA_CTRL_2,             FMKCPU_DMA_CHANNEL_7,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_USART3_TX
         {FMKCPU_DMA_CTRL_2,             FMKCPU_DMA_CHANNEL_3,          FMKCPU_DMA_TRANSPRIO_MEDIUM},   // FMKCPU_DMA_RQSTYPE_TIM8_CH1
     };
 
@@ -607,6 +622,24 @@
     void DMA1_Channel5_IRQHandler(void)
     {
         HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_5));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel6 interrupt.
+    */
+    void DMA1_Channel6_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_6));
+    return;
+    }
+
+    /**
+    * @brief This function handles DMA Channel7 interrupt.
+    */
+    void DMA1_Channel7_IRQHandler(void)
+    {
+        HAL_DMA_IRQHandler(FMKCPU_PRIVATE_GetHandleTypeDef(FMKCPU_DMA_CTRL_1, FMKCPU_DMA_CHANNEL_7));
     return;
     }
 

@@ -122,6 +122,37 @@
         FMKCPU_DMA_TRANSDIR_NB
     } t_eFMKCPU_DmaTransferDir;
 
+    ///@brief diagnostic to determine the cause of a reset on cpu 
+    typedef enum 
+    {
+        FMKCPU_RESET_CAUSE_NONE = 0,      /*!< No reset flags are active (or flags have been manually cleared) */
+
+        FMKCPU_RESET_CAUSE_OBLRST,        /*!< Reset caused by Option Bytes reconfiguration (OBL reset).
+                                            Typically triggered after updating flash option bytes via ST-Link
+                                            or In-Application Programming (IAP). */
+
+        FMKCPU_RESET_CAUSE_PINRST,        /*!< Reset triggered by the NRST pin (external hardware reset).
+                                            This could be a reset button press or an external reset signal. */
+
+        FMKCPU_RESET_CAUSE_BORRST,        /*!< Brown-Out Reset: caused when the supply voltage drops
+                                            below a critical threshold, to prevent undefined behavior. */
+
+        FMKCPU_RESET_CAUSE_SFRST,         /*!< Software Reset: triggered via software, for example by calling
+                                            `NVIC_SystemReset()` or using internal system mechanisms. */
+
+        FMKCPU_RESET_CAUSE_IWDRST,        /*!< Reset caused by the Independent Watchdog (IWDG),
+                                            if the watchdog is not refreshed in time.
+                                            Operates independently, even in Stop/Standby modes. */
+
+        FMKCPU_RESET_CAUSE_WWDRST,        /*!< Reset caused by the Window Watchdog (WWDG),
+                                            if the watchdog is refreshed too early, too late, or not at all.
+                                            It is driven by the system clock. */
+
+        FMKCPU_RESET_CAUSE_LPWRRST,       /*!< Reset due to a Low-Power event (Low-Power Reset),
+                                            typically triggered during improper transitions
+                                            into or out of Stop/Standby modes. */
+
+    } t_eFMKCPU_CpuResetFlag;
 
     //-----------------------------ENUM TYPES-----------------------------//
     /* CAUTION : Automatic generated code section for Enum: Start */
@@ -336,6 +367,8 @@
         FMKCPU_DMA_RQSTYPE_USART1_TX,                /**< Reference to Bsp Dma Request for USART1_TX */
         FMKCPU_DMA_RQSTYPE_USART2_RX,                /**< Reference to Bsp Dma Request for USART2_RX */
         FMKCPU_DMA_RQSTYPE_USART2_TX,                /**< Reference to Bsp Dma Request for USART2_TX */
+        FMKCPU_DMA_RQSTYPE_USART3_RX,                /**< Reference to Bsp Dma Request for USART3_RX */
+        FMKCPU_DMA_RQSTYPE_USART3_TX,                /**< Reference to Bsp Dma Request for USART3_TX */
         FMKCPU_DMA_RQSTYPE_TIM8_CH1,                 /**< Reference to Bsp Dma Request for TIM8_CH1 */
     
         FMKCPU_DMA_RQSTYPE_NB,
