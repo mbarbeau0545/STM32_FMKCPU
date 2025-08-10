@@ -247,7 +247,7 @@ t_eReturnCode FMKCPU_Init(void)
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].c_IRQNType_e =
                 c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].c_IRQNType_e;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].bspDma_s.Instance =
-                (DMA_Channel_TypeDef *)c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].Instance;
+                (FMKCPU_DmaChnlTypeDef *)c_FmkCpu_DmaCfg_as[idxDma_u8].chnlCfg_as[idxChnl_u8].Instance;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].isChnlConfigured_b = (t_bool)False;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].chnlErr_e = FMKCPU_DMA_ERRSTATE_OK;
             g_DmaInfo_as[idxDma_u8].channel_as[idxChnl_u8].ErrorDetected_b = (t_bool)FALSE;
@@ -420,12 +420,12 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
 {
     t_eReturnCode Ret_e = RC_OK;
     HAL_StatusTypeDef  bspRet_e = HAL_OK;
-    
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
     t_uint32 bspSysClkFreqHz_u32;
     t_uint32 SysClkFreqHz_u32;
     t_sFMKCPU_SysOscCfg * bspOscCfg_ps;
+    t_sFMKCPU_PllOscCfg * pll1OscCfg_ps;
 
 
     if(f_SystemCoreFreq_e >= FMKCPU_CORE_CLOCK_SPEED_NB)
@@ -436,46 +436,68 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
     if(Ret_e == RC_OK)
     {
         bspOscCfg_ps = (t_sFMKCPU_SysOscCfg *)&c_FmkCpu_SysOscCfg_as[f_SystemCoreFreq_e];
+        pll1OscCfg_ps = (t_sFMKCPU_PllOscCfg *)&c_FmkCpu_Pll1OscCfg_as;
 
-#ifdef FMKCPU_STM32_ECU_FAMILY_G
-        //---- for system ----//
+                //---- for system ----//
         RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSI ;               // 16 MHz
         RCC_OscInitStruct.HSIState = RCC_HSI_ON;
         RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
         RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                             // use divider and stuff
         RCC_OscInitStruct.LSIState = RCC_LSI_ON;
         RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;                     // use HSI as PLL source clock
-        RCC_OscInitStruct.PLL.PLLM = bspOscCfg_ps->PLLM_Divider_u32;             // Divided the HSI clock sources
-        RCC_OscInitStruct.PLL.PLLN = bspOscCfg_ps->PPLN_Multplier_u32;           // Multiplied the HSI clock sources
-        RCC_OscInitStruct.PLL.PLLP = bspOscCfg_ps->PLLP_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLP clock source    
-        RCC_OscInitStruct.PLL.PLLQ = bspOscCfg_ps->PPLQ_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLQ clock source    
-        RCC_OscInitStruct.PLL.PLLR = bspOscCfg_ps->PLLR_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLCLK (SYSCLK) clock sources
-        
+        RCC_OscInitStruct.PLL.PLLM = pll1OscCfg_ps->PLLM_Divider_u32;             // Divided the HSI clock sources
+        RCC_OscInitStruct.PLL.PLLN = pll1OscCfg_ps->PPLN_Multplier_u32;           // Multiplied the HSI clock sources
+        RCC_OscInitStruct.PLL.PLLP = pll1OscCfg_ps->PLLP_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLP clock source    
+        RCC_OscInitStruct.PLL.PLLQ = pll1OscCfg_ps->PLLQ_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLQ clock source    
+        RCC_OscInitStruct.PLL.PLLR = pll1OscCfg_ps->PLLR_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLCLK (SYSCLK) clock sources
 
+#ifdef FMKCPU_STM32_ECU_FAMILY_G4
+
+
+        RCC_ClkInitStruct.ClockType      = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                                            |RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+                                            
+        RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK; 
+        RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider_u32;
+        RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
+        RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
+
+
+                                            
         bspRet_e = HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
-        
+#elif defined FMKCPU_STM32_ECU_FAMILY_H7
+        //---- Cortex M7 need that stuff cfg ----//
+        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_RGE_Range_u32;
+        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_VCOSEL_u32;
+        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_FRACN_u32;
+
+        //---- Cortex M7 System Clk Cfg ----//
+        RCC_ClkInitStruct.ClockType      = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                                            | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
+                                            | RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
+                                            
+        RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK; 
+        RCC_ClkInitStruct.SYSCLKDivider  = bspOscCfg_ps->SysClk_Divider_u32;
+        RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider_u32;
+        RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
+        RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
+        RCC_ClkInitStruct.APB3CLKDivider = bspOscCfg_ps->APB3_Divider_u32;
+        RCC_ClkInitStruct.APB4CLKDivider = bspOscCfg_ps->APB4_Divider_u32;
+
 #elif defined FMKCPU_STM32_ECU_FAMILY_F
 
         RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
         RCC_OscInitStruct.HSIState = RCC_HSI_ON;
         RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
         RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-
 #else 
     #error("Unknwon Stm32 Family")
-#endif
-
-
-        RCC_ClkInitStruct.ClockType      = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                            |RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-
-        RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK; 
-        RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider;
-        RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
-        RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
-
+#endif      
+        
         if(bspRet_e == HAL_OK)
-        bspRet_e = HAL_RCC_OscConfig(&RCC_OscInitStruct);
+        {
+            bspRet_e = HAL_RCC_OscConfig(&RCC_OscInitStruct);
+        }
         if(bspRet_e == HAL_OK)
         {
             bspRet_e = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
@@ -488,22 +510,29 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         }
         else 
         {
-            Ret_e = SafeMem_memcpy(&g_SysClockValue_ua8, &c_FmkCpu_CoreClkValue_ua8[f_SystemCoreFreq_e], (t_uint16)(sizeof(t_uint8) * FMKCPU_SYS_CLOCK_NB));
+            //---- perform specific PLL configuration with peripheral ----//
+            Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
             if(Ret_e == RC_OK)
             {
-                //------Get the system core frequency set by the bsp------//
-                bspSysClkFreqHz_u32 = HAL_RCC_GetSysClockFreq();
-                //------Get the system core frequency wanted by user------//
-                SysClkFreqHz_u32 = (t_uint32)g_SysClockValue_ua8[FMKCPU_SYS_CLOCK_SYSTEM];
-                //------Compare both value------//
-                if(bspSysClkFreqHz_u32 != (t_uint32)(SysClkFreqHz_u32 * CST_MHZ_TO_HZ))
+                Ret_e = SafeMem_memcpy( &g_SysClockValue_ua8, 
+                                        &c_FmkCpu_CoreClkValue_ua8[f_SystemCoreFreq_e], 
+                                        (t_uint16)(sizeof(t_uint8) * FMKCPU_SYS_CLOCK_NB));
+                if(Ret_e == RC_OK)
                 {
-                    Ret_e = RC_ERROR_WRONG_RESULT;
-                    ASSERT((t_uint16)Ret_e);
-                }
-                else 
-                {
-                    g_IsSysClkInit_b = (t_bool)True;
+                    //------Get the system core frequency set by the bsp------//
+                    bspSysClkFreqHz_u32 = HAL_RCC_GetSysClockFreq();
+                    //------Get the system core frequency wanted by user------//
+                    SysClkFreqHz_u32 = (t_uint32)g_SysClockValue_ua8[FMKCPU_SYS_CLOCK_SYSTEM];
+                    //------Compare both value------//
+                    if(bspSysClkFreqHz_u32 != (t_uint32)(SysClkFreqHz_u32 * CST_MHZ_TO_HZ))
+                    {
+                        Ret_e = RC_ERROR_WRONG_RESULT;
+                        ASSERT((t_uint16)Ret_e);
+                    }
+                    else 
+                    {
+                        g_IsSysClkInit_b = (t_bool)True;
+                    }
                 }
             }
         }
@@ -519,19 +548,54 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
 {
     t_eReturnCode Ret_e = RC_OK;
     HAL_StatusTypeDef bspRet_e = HAL_OK;
+#if defined (FMKCPU_STM32_ECU_FAMILY_H7)
+    MPU_Region_InitTypeDef MPU_InitStruct = {0};
+
+    /* Disables the MPU */
+    HAL_MPU_Disable();
+
+    /** Initializes and configures the Region and the memory to be protected
+     */
+    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+    MPU_InitStruct.BaseAddress = 0x0;
+    MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
+    MPU_InitStruct.SubRegionDisable = 0x87;
+    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+    MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+    /* Enables the MPU */
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+#endif // FMKCPU_STM32_ECU_FAMILY_H7
 
     bspRet_e = HAL_Init();
+
     if(bspRet_e == HAL_OK)
     {
-        bspRet_e = HAL_InitTick(0x00); // High Priority
+        //---- reconfigure init tick with high NVIC Priority ----//
+        bspRet_e = HAL_InitTick(0x00);
     }
+    if(bspRet_e == HAL_OK)
+    {
+        bspRet_e = HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
+    }
+    if(bspRet_e == HAL_OK)
+    {
+        bspRet_e = HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0);    
+    }
+    
     if(bspRet_e != HAL_OK)
     {
         Ret_e = RC_ERROR_WRONG_RESULT;
         ASSERT((t_uint16)Ret_e);
     }
 
-#ifdef FMKCPU_STM32_ECU_FAMILY_G
+#if defined(FMKCPU_STM32_ECU_FAMILY_G4)
     
     if(Ret_e == RC_OK)
     {
@@ -544,6 +608,11 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
     if(Ret_e == RC_OK)
     {
         HAL_PWREx_DisableUCPDDeadBattery();
+    }
+#elif defined(FMKCPU_STM32_ECU_FAMILY_H7)
+    if(Ret_e == RC_OK)
+    {
+        Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_SYSCFG, FMKCPU_CLOCKPORT_OPE_ENABLE);
     }
 #endif
 
@@ -624,7 +693,7 @@ t_eReturnCode FMKCPU_Set_HwClock(t_eFMKCPU_ClockPort f_clkPort_e,
         {
         case FMKCPU_CLOCKPORT_OPE_ENABLE:
         {
-#ifdef FMKCPU_STM32_ECU_FAMILY_G
+#ifdef FMKCPU_STM32_ECU_FAMILY_G4
             //------------------- Set Peripheral Clock config if needed----------------//
             Ret_e = FMKCPU_SetPeriphClockCfg(f_clkPort_e);
 #endif
@@ -679,7 +748,7 @@ t_eReturnCode FMKCPU_Set_WwdgCfg(t_eFMKCPu_WwdgResetPeriod f_period_e)
     }
     else
     {
-        g_iwdgInfos_s.Instance = IWDG;
+        g_iwdgInfos_s.Instance = (IWDG_TypeDef *)FMKCPU_WWDG_INSTANCE;
         //---- LSE oscillator is 32 KHz -----//
         g_iwdgInfos_s.Init.Prescaler = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].psc_u16;
         g_iwdgInfos_s.Init.Reload    = c_FMKCPU_WwdgPeriodcfg_ua16[f_period_e].reload_u16;
@@ -695,7 +764,7 @@ t_eReturnCode FMKCPU_Set_WwdgCfg(t_eFMKCPu_WwdgResetPeriod f_period_e)
         else 
         {
             //---- enable to freeze the watchdog in debug ----//
-            __HAL_DBGMCU_FREEZE_IWDG();
+            FMKPCU_DISABLE_WWDG_DEBUG();
             Ret_e = RC_OK;
             g_isWwgInit_b = (t_bool)TRUE;
         }
@@ -877,11 +946,6 @@ t_eReturnCode FMKCPU_GetSysClkValue(    t_eFMKCPU_SysClkOsc f_ClkOsc_e,
  *********************************/
 static void s_FMKCPU_CheckResetCpuFlag(void)
 {
-    if (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST))
-    {
-        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_OBLRST;
-        FMKSRL_LOG("[RESET] Option Byte Loader Reset (OBLRST)\n");
-    }
     if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST))
     {
         g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_PINRST;
@@ -896,6 +960,12 @@ static void s_FMKCPU_CheckResetCpuFlag(void)
     {
         g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_SFRST;
         FMKSRL_LOG("[RESET] Software Reset (SFTRST)\n");
+    }
+#if defined(FMKCPU_STM32_ECU_FAMILY_G4)
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST))
+    {
+        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_OBLRST;
+        FMKSRL_LOG("[RESET] Option Byte Loader Reset (OBLRST)\n");
     }
     if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST))
     {
@@ -912,6 +982,7 @@ static void s_FMKCPU_CheckResetCpuFlag(void)
         g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_LPWRRST;
         FMKSRL_LOG("[RESET] Low Power Reset (LPWRRST)\n");
     }
+#endif // FMKCPU_STM32_ECU_FAMILY_G4
 
     // Efface tous les flags une fois lus
     __HAL_RCC_CLEAR_RESET_FLAGS();
