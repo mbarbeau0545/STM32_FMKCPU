@@ -436,14 +436,14 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
     if(Ret_e == RC_OK)
     {
         bspOscCfg_ps = (t_sFMKCPU_SysOscCfg *)&c_FmkCpu_SysOscCfg_as[f_SystemCoreFreq_e];
-        pll1OscCfg_ps = (t_sFMKCPU_PllOscCfg *)&c_FmkCpu_Pll1OscCfg_as;
+        pll1OscCfg_ps = (t_sFMKCPU_PllOscCfg *)&c_FmkCpu_Pll1OscCfg_as[f_SystemCoreFreq_e];
 
-                //---- for system ----//
+        //---- for system ----//
         RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSI ;               // 16 MHz
         RCC_OscInitStruct.HSIState = RCC_HSI_ON;
         RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
         RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                             // use divider and stuff
-        RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+        RCC_OscInitStruct.LSIState = RCC_LSI_ON;    
         RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;                     // use HSI as PLL source clock
         RCC_OscInitStruct.PLL.PLLM = pll1OscCfg_ps->PLLM_Divider_u32;             // Divided the HSI clock sources
         RCC_OscInitStruct.PLL.PLLN = pll1OscCfg_ps->PPLN_Multplier_u32;           // Multiplied the HSI clock sources
@@ -461,10 +461,7 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider_u32;
         RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
         RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
-
-
-                                            
-        bspRet_e = HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
+                                        
 #elif defined FMKCPU_STM32_ECU_FAMILY_H7
         //---- Cortex M7 need that stuff cfg ----//
         RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_RGE_Range_u32;
@@ -494,6 +491,12 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
     #error("Unknwon Stm32 Family")
 #endif      
         
+        bspRet_e = HAL_PWREx_ControlVoltageScaling(FMKCPU_CTRL_VOLTAGE_SCALING);
+
+        if(bspRet_e != HAL_OK)
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }    
         if(bspRet_e == HAL_OK)
         {
             bspRet_e = HAL_RCC_OscConfig(&RCC_OscInitStruct);
@@ -511,7 +514,7 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         else 
         {
             //---- perform specific PLL configuration with peripheral ----//
-            Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
+            //Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
             if(Ret_e == RC_OK)
             {
                 Ret_e = SafeMem_memcpy( &g_SysClockValue_ua8, 
@@ -579,20 +582,10 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
     {
         //---- reconfigure init tick with high NVIC Priority ----//
         bspRet_e = HAL_InitTick(0x00);
-    }
-    if(bspRet_e == HAL_OK)
-    {
-        bspRet_e = HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
-    }
-    if(bspRet_e == HAL_OK)
-    {
-        bspRet_e = HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0);    
-    }
-    
+    }    
     if(bspRet_e != HAL_OK)
     {
         Ret_e = RC_ERROR_WRONG_RESULT;
-        ASSERT((t_uint16)Ret_e);
     }
 
 #if defined(FMKCPU_STM32_ECU_FAMILY_G4)
@@ -613,9 +606,18 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
     if(Ret_e == RC_OK)
     {
         Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_SYSCFG, FMKCPU_CLOCKPORT_OPE_ENABLE);
+
+        if(Ret_e == RC_OK)
+        {                        
+            bspRet_e = HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
+            
+            if(bspRet_e != HAL_OK)
+            {
+                Ret_e = RC_ERROR_WRONG_RESULT;
+            }
+        }
     }
 #endif
-
     if(Ret_e != RC_OK)
     {
         g_FmkCpu_ModState_e = STATE_CYCLIC_ERROR;
@@ -693,23 +695,14 @@ t_eReturnCode FMKCPU_Set_HwClock(t_eFMKCPU_ClockPort f_clkPort_e,
         {
         case FMKCPU_CLOCKPORT_OPE_ENABLE:
         {
-#ifdef FMKCPU_STM32_ECU_FAMILY_G4
-            //------------------- Set Peripheral Clock config if needed----------------//
-            Ret_e = FMKCPU_SetPeriphClockCfg(f_clkPort_e);
-#endif
-            if(Ret_e == RC_OK)
+            if (c_FMKCPU_ClkFunctions_apcb[f_clkPort_e].EnableClk_pcb != (t_cbFMKCPU_ClockDisable *)NULL_FUNCTION)
             {
-                if (c_FMKCPU_ClkFunctions_apcb[f_clkPort_e].EnableClk_pcb != (t_cbFMKCPU_ClockDisable *)NULL_FUNCTION)
-                {
-                    c_FMKCPU_ClkFunctions_apcb[f_clkPort_e].EnableClk_pcb();
-                }
-                else
-                {
-                    Ret_e = RC_WARNING_NO_OPERATION;
-                }
-
+                c_FMKCPU_ClkFunctions_apcb[f_clkPort_e].EnableClk_pcb();
             }
-            
+            else
+            {
+                Ret_e = RC_WARNING_NO_OPERATION;
+            }            
             break;
         }
         case FMKCPU_CLOCKPORT_OPE_DISABLE:
