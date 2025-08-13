@@ -28,7 +28,7 @@
     // *                      Defines
     // ********************************************************************
     // flag automatic generate code
-    #define FMKCPU_STM32_ECU_FAMILY_G ((t_uint8)1)
+    #define FMKCPU_STM32_ECU_FAMILY_G4 ((t_uint8)1)
     //#define FMKCPU_STM32_ECU_FAMILY_F ((t_uint8)0)
     
     #define FMKCPU_WWDG_RESET_CFG  FMKCPU_WWDG_RESET_100MS /**< default watchdogs configuration */

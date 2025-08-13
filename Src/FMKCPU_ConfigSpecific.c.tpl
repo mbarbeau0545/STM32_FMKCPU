@@ -460,7 +460,7 @@ t_eReturnCode FMKCPU_Get_BspIRQNType(t_eFMKCPU_IRQNType f_IRQN_e, IRQn_Type *f_b
     return Ret_e;
 }
 
-#ifdef FMKCPU_STM32_ECU_FAMILY_G
+#ifdef FMKCPU_STM32_ECU_FAMILY_G4
 /*********************************
  * FMKCPU_SetPeriphClockCfg
  *********************************/

@@ -120,7 +120,7 @@
         t_uint32 PLLR_Divider_u32;
         t_uint32 PPLQ_Divider_u32;
         t_uint32 PLLP_Divider_u32;
-        t_uint32 AHB_Divider;
+        t_uint32 AHB_Divider_u32;
         t_uint32 APB1_Divider_u32;
         t_uint32 APB2_Divider_u32;
     } t_sFMKCPU_SysOscCfg;
@@ -132,10 +132,10 @@
     // ********************************************************************
     // *                      Variables
     // ********************************************************************
-#ifdef FMKCPU_STM32_ECU_FAMILY_G
+#ifdef(FMKCPU_STM32_ECU_FAMILY_G4)
     //---------Configuration Clock System---------------------------//
     const t_sFMKCPU_SysOscCfg c_FmkCpu_SysOscCfg_as[FMKCPU_CORE_CLOCK_SPEED_NB] = {
-    //   PLLM_Divider_u32         PPLN_Multplier_u32         PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider                  APB1_Divider_u32        APB2_Divider_u32
+    //   PLLM_Divider_u32         PPLN_Multplier_u32         PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider_u32                  APB1_Divider_u32        APB2_Divider_u32
         {RCC_PLLM_DIV2,         (t_uint32)12,                RCC_PLLR_DIV8,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV2,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, // FMKCPU_CORE_CLOCK_SPEED_8MHZ
         {RCC_PLLM_DIV4,         (t_uint32)16,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV2,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_16MHZ
         {RCC_PLLM_DIV4,         (t_uint32)48,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV4,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_32MHZ
@@ -161,9 +161,27 @@
         {(t_uint8)8,                            (t_uint8)16,                      (t_uint8)128,                  (t_uint8)128,                   (t_uint8)128,                (t_uint8)128,                (t_uint8)64,                    (t_uint8)64,                  (t_uint8)128,                 (t_uint8)42},  //  FMKCPU_CORE_CLOCK_SPEED_128MHZ
         {(t_uint8)8,                            (t_uint8)16,                      (t_uint8)160,                  (t_uint8)160,                   (t_uint8)160,                (t_uint8)160,                (t_uint8)80,                    (t_uint8)80,                  (t_uint8)160,                 (t_uint8)40},  //  FMKCPU_CORE_CLOCK_SPEED_160MHZ
     };
+#elif defined(FMKCPU_STM32_ECU_FAMILY_H7)
+    const t_sFMKCPU_SysOscCfg c_FmkCpu_SysOscCfg_as[FMKCPU_CORE_CLOCK_SPEED_NB] = {
+    //   PLLM_Divider_u32         PPLN_Multplier_u32         PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider_u32                  APB1_Divider_u32        APB2_Divider_u32
+        {RCC_PLLM_DIV2,         (t_uint32)12,                RCC_PLLR_DIV8,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV2,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, // FMKCPU_CORE_CLOCK_SPEED_8MHZ
+        {RCC_PLLM_DIV4,         (t_uint32)16,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV2,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_16MHZ
+        {RCC_PLLM_DIV4,         (t_uint32)48,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV4,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_32MHZ
+        {RCC_PLLM_DIV4,         (t_uint32)60,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV6,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_40MHZ
+        {RCC_PLLM_DIV4,         (t_uint32)72,                RCC_PLLR_DIV6,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV6,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_48MHZ
+        {RCC_PLLM_DIV4,         (t_uint32)64,                RCC_PLLR_DIV4,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV6,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV1,          RCC_HCLK_DIV1}, //  FMKCPU_CORE_CLOCK_SPEED_64MHZ
+        {RCC_PLLM_DIV3,         (t_uint32)60,                RCC_PLLR_DIV4,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV8,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV2,          RCC_HCLK_DIV2}, //  FMKCPU_CORE_CLOCK_SPEED_80MHZ
+        {RCC_PLLM_DIV3,         (t_uint32)24,                RCC_PLLR_DIV2,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV4,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV2,          RCC_HCLK_DIV2}, //  FMKCPU_CORE_CLOCK_SPEED_96MHZ
+        {RCC_PLLM_DIV1,         (t_uint32)16,                RCC_PLLR_DIV2,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV6,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV2,          RCC_HCLK_DIV2}, //  FMKCPU_CORE_CLOCK_SPEED_128MHZ
+        {RCC_PLLM_DIV1,         (t_uint32)20,                RCC_PLLR_DIV2,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV8,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV2,          RCC_HCLK_DIV2}, //  FMKCPU_CORE_CLOCK_SPEED_160MHZ
+    };
+#else 
+    #error("Famille STM32 non supportée. Vérifiez la configuration.")
+#endif
+    
 #elif defined FMKCPU_STM32_ECU_FAMILY_F
     const t_sFMKCPU_SysOscCfg c_FmkCpu_SysOscCfg_s = {
-    // PLLM_Divider_u32         PPLN_Multplier_u32          PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider                  APB1_Divider_u32        APB2_Divider_u32
+    // PLLM_Divider_u32         PPLN_Multplier_u32          PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider_u32                  APB1_Divider_u32        APB2_Divider_u32
     };
     const t_uint8 c_FmkCpu_CoreClkValue_ua8[FMKCPU_SYS_CLOCK_NB] = 
     {
