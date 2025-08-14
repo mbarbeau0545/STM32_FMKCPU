@@ -662,7 +662,12 @@ t_eReturnCode FMKCPU_Set_NVICState(t_eFMKCPU_IRQNType f_IRQN_e, t_eFMKCPU_NVIC_O
 
             case FMKCPU_NVIC_OPE_DISABLE:
             {
-                HAL_NVIC_DisableIRQ((IRQn_Type)f_IRQN_e);
+                HAL_NVIC_DisableIRQ((IRQn_Type)bspIRQN_e);
+                break;
+            }
+            case FMKCPU_NVIC_OPE_CLEAR_IT:
+            {
+                NVIC_ClearPendingIRQ((IRQn_Type)bspIRQN_e);
                 break;
             }
             case FMKCPU_NVIC_OPE_NB:

@@ -50,6 +50,7 @@
     {
         FMKCPU_NVIC_OPE_ENABLE = 0x0U,          /**< The operation to make on NVIC is to enable it */
         FMKCPU_NVIC_OPE_DISABLE,                /**< The operation to make on NVIC is to disable it */
+        FMKCPU_NVIC_OPE_CLEAR_IT,                /**< Cleat Interrupt in Queue */
 
         FMKCPU_NVIC_OPE_NB
     } t_eFMKCPU_NVIC_Ope;
