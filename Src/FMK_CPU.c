@@ -618,6 +618,14 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
         }
     }
 #endif
+    //---- enable the FPU (Float Unit Point) ---//
+    if(Ret_e == RC_OK)
+    {
+        SCB->CPACR |= ((3UL << 20) | (3UL << 22)); // CP10 et CP11 full access
+        __DSB();
+        __ISB();
+    }
+
     if(Ret_e != RC_OK)
     {
         g_FmkCpu_ModState_e = STATE_CYCLIC_ERROR;
@@ -662,7 +670,12 @@ t_eReturnCode FMKCPU_Set_NVICState(t_eFMKCPU_IRQNType f_IRQN_e, t_eFMKCPU_NVIC_O
 
             case FMKCPU_NVIC_OPE_DISABLE:
             {
-                HAL_NVIC_DisableIRQ((IRQn_Type)f_IRQN_e);
+                HAL_NVIC_DisableIRQ((IRQn_Type)bspIRQN_e);
+                break;
+            }
+            case FMKCPU_NVIC_OPE_CLEAR_IT:
+            {
+                NVIC_ClearPendingIRQ((IRQn_Type)bspIRQN_e);
                 break;
             }
             case FMKCPU_NVIC_OPE_NB:
