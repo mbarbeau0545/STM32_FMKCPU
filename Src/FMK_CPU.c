@@ -618,6 +618,14 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
         }
     }
 #endif
+    //---- enable the FPU (Float Unit Point) ---//
+    if(Ret_e == RC_OK)
+    {
+        SCB->CPACR |= ((3UL << 20) | (3UL << 22)); // CP10 et CP11 full access
+        __DSB();
+        __ISB();
+    }
+
     if(Ret_e != RC_OK)
     {
         g_FmkCpu_ModState_e = STATE_CYCLIC_ERROR;
