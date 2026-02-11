@@ -514,7 +514,7 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         else 
         {
             //---- perform specific PLL configuration with peripheral ----//
-            //Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
+            Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
             if(Ret_e == RC_OK)
             {
                 Ret_e = SafeMem_memcpy( &g_SysClockValue_ua8, 
