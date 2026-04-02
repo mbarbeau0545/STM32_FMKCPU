@@ -815,13 +815,12 @@ t_eReturnCode FMKCPU_RqstDmaInit(   t_eFMKCPU_DmaRqst f_DmaRqstType,
         Ret_e = RC_ERROR_PARAM_INVALID;
         ASSERT((t_uint16)Ret_e);
     } 
-    if(f_ModuleHandle_pv == (void *)NULL)
+    else if(f_ModuleHandle_pv == (void *)NULL)
     {
         Ret_e = RC_ERROR_PTR_NULL;
         ASSERT((t_uint16)Ret_e);
     }
-    
-    if(Ret_e == RC_OK)
+    else
     {
         //--------- Reach Information ---------//
         dmaCtrl_e = c_FMKCPU_DmaRqstCfg_as[f_DmaRqstType].Ctrl_e;
