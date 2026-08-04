@@ -154,6 +154,41 @@
 
     } t_eFMKCPU_CpuResetFlag;
 
+    ///@brief diagnostic to determine the CPU exception that trapped the software
+    typedef enum
+    {
+        FMKCPU_CORE_FAULT_NONE = 0,       /*!< No CPU core fault captured */
+        FMKCPU_CORE_FAULT_HARDFAULT,      /*!< Cortex-M HardFault exception */
+        FMKCPU_CORE_FAULT_MEMMANAGE,      /*!< Cortex-M MemManage exception */
+        FMKCPU_CORE_FAULT_BUSFAULT,       /*!< Cortex-M BusFault exception */
+        FMKCPU_CORE_FAULT_USAGEFAULT,     /*!< Cortex-M UsageFault exception */
+
+        FMKCPU_CORE_FAULT_NB,
+    } t_eFMKCPU_CoreFault;
+
+    ///@brief CPU exception debug snapshot captured before entering assertion trap
+    typedef struct
+    {
+        t_eFMKCPU_CoreFault faultType_e;
+        t_uint32 cfsr_u32;
+        t_uint32 hfsr_u32;
+        t_uint32 dfsr_u32;
+        t_uint32 afsr_u32;
+        t_uint32 mmfar_u32;
+        t_uint32 bfar_u32;
+        t_uint32 msp_u32;
+        t_uint32 psp_u32;
+        t_uint32 excReturn_u32;
+        t_uint32 stackedR0_u32;
+        t_uint32 stackedR1_u32;
+        t_uint32 stackedR2_u32;
+        t_uint32 stackedR3_u32;
+        t_uint32 stackedR12_u32;
+        t_uint32 stackedLr_u32;
+        t_uint32 stackedPc_u32;
+        t_uint32 stackedXpsr_u32;
+    } t_sFMKCPU_CoreFaultInfo;
+
     //-----------------------------ENUM TYPES-----------------------------//
     /* CAUTION : Automatic generated code section for Enum: Start */
     /**

@@ -85,8 +85,9 @@ static t_eCyclicModState g_FmkCpu_ModState_e = STATE_CYCLIC_CFG;
 
 IWDG_HandleTypeDef g_iwdgInfos_s = {0};
 
-t_uint8 g_SysClockValue_ua8[FMKCPU_SYS_CLOCK_NB];
+t_uint16 g_SysClockValue_ua16[FMKCPU_SYS_CLOCK_NB];
 t_eFMKCPU_CpuResetFlag g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_NONE;
+volatile t_sFMKCPU_CoreFaultInfo g_CoreFaultInfo_s = {0};
 t_bool g_IsSysClkInit_b = (t_bool)FALSE;
 t_bool g_isWwgInit_b = (t_bool)FALSE;
 //********************************************************************************
@@ -97,6 +98,9 @@ t_bool g_isWwgInit_b = (t_bool)FALSE;
  *	@brief      Perform all cyclic operatiDiagnostic purpose to know why the Cpu has reset.
  */
 static void s_FMKCPU_CheckResetCpuFlag(void);
+static void s_FMKCPU_CoreFaultHandler(t_uint32 *f_stackFrame_pu32,
+                                      t_uint32 f_excReturn_u32,
+                                      t_eFMKCPU_CoreFault f_faultType_e) __attribute__((used, noinline));
 /**
  *
  *	@brief      Perform all cyclic operation
@@ -326,6 +330,42 @@ t_eReturnCode FMKCPU_GetState(t_eCyclicModState *f_State_pe)
 }
 
 /*********************************
+ * FMKCPU_GetLastCoreFaultInfo
+ *********************************/
+t_eReturnCode FMKCPU_GetLastCoreFaultInfo(t_sFMKCPU_CoreFaultInfo *f_faultInfo_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+
+    if(f_faultInfo_ps == (t_sFMKCPU_CoreFaultInfo *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    if(Ret_e == RC_OK)
+    {
+        f_faultInfo_ps->faultType_e = g_CoreFaultInfo_s.faultType_e;
+        f_faultInfo_ps->cfsr_u32 = g_CoreFaultInfo_s.cfsr_u32;
+        f_faultInfo_ps->hfsr_u32 = g_CoreFaultInfo_s.hfsr_u32;
+        f_faultInfo_ps->dfsr_u32 = g_CoreFaultInfo_s.dfsr_u32;
+        f_faultInfo_ps->afsr_u32 = g_CoreFaultInfo_s.afsr_u32;
+        f_faultInfo_ps->mmfar_u32 = g_CoreFaultInfo_s.mmfar_u32;
+        f_faultInfo_ps->bfar_u32 = g_CoreFaultInfo_s.bfar_u32;
+        f_faultInfo_ps->msp_u32 = g_CoreFaultInfo_s.msp_u32;
+        f_faultInfo_ps->psp_u32 = g_CoreFaultInfo_s.psp_u32;
+        f_faultInfo_ps->excReturn_u32 = g_CoreFaultInfo_s.excReturn_u32;
+        f_faultInfo_ps->stackedR0_u32 = g_CoreFaultInfo_s.stackedR0_u32;
+        f_faultInfo_ps->stackedR1_u32 = g_CoreFaultInfo_s.stackedR1_u32;
+        f_faultInfo_ps->stackedR2_u32 = g_CoreFaultInfo_s.stackedR2_u32;
+        f_faultInfo_ps->stackedR3_u32 = g_CoreFaultInfo_s.stackedR3_u32;
+        f_faultInfo_ps->stackedR12_u32 = g_CoreFaultInfo_s.stackedR12_u32;
+        f_faultInfo_ps->stackedLr_u32 = g_CoreFaultInfo_s.stackedLr_u32;
+        f_faultInfo_ps->stackedPc_u32 = g_CoreFaultInfo_s.stackedPc_u32;
+        f_faultInfo_ps->stackedXpsr_u32 = g_CoreFaultInfo_s.stackedXpsr_u32;
+    }
+
+    return Ret_e;
+}
+
+/*********************************
  * FMKCPU_SetState
  *********************************/
 t_eReturnCode FMKCPU_SetState(t_eCyclicModState f_State_e)
@@ -419,8 +459,9 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
     t_uint32 bspSysClkFreqHz_u32;
     t_uint32 SysClkFreqHz_u32;
-    t_sFMKCPU_SysOscCfg * bspOscCfg_ps;
-    t_sFMKCPU_PllOscCfg * pll1OscCfg_ps;
+    const t_sFMKCPU_SysOscCfg * bspOscCfg_ps;
+    const t_sFMKCPU_PllOscCfg * pll1OscCfg_ps;
+    const t_sFMKCPU_PllOscCfg * const * pllOtherCfg_pps;
 
 
     if(f_SystemCoreFreq_e >= FMKCPU_CORE_CLOCK_SPEED_NB)
@@ -430,75 +471,37 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
     }
     if(Ret_e == RC_OK)
     {
-        bspOscCfg_ps = (t_sFMKCPU_SysOscCfg *)&c_FmkCpu_SysOscCfg_as[f_SystemCoreFreq_e];
-        pll1OscCfg_ps = (t_sFMKCPU_PllOscCfg *)&c_FmkCpu_Pll1OscCfg_as[f_SystemCoreFreq_e];
-
-        //---- for system ----//
-        RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSI ;               // 16 MHz
-        RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-        RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-        RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                             // use divider and stuff
-        RCC_OscInitStruct.LSIState = RCC_LSI_ON;    
-        RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;                     // use HSI as PLL source clock
-        RCC_OscInitStruct.PLL.PLLM = pll1OscCfg_ps->PLLM_Divider_u32;             // Divided the HSI clock sources
-        RCC_OscInitStruct.PLL.PLLN = pll1OscCfg_ps->PPLN_Multplier_u32;           // Multiplied the HSI clock sources
-        RCC_OscInitStruct.PLL.PLLP = pll1OscCfg_ps->PLLP_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLP clock source    
-        RCC_OscInitStruct.PLL.PLLQ = pll1OscCfg_ps->PLLQ_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLQ clock source    
-        RCC_OscInitStruct.PLL.PLLR = pll1OscCfg_ps->PLLR_Divider_u32;             // Divided the HSI clock sources -> that gives us PPLCLK (SYSCLK) clock sources
-
-#ifdef FMKCPU_STM32_ECU_FAMILY_G4
-
-
-        RCC_ClkInitStruct.ClockType      = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                            |RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-                                            
-        RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK; 
-        RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider_u32;
-        RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
-        RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
-                                        
-#elif defined FMKCPU_STM32_ECU_FAMILY_H7
-        //---- Cortex M7 need that stuff cfg ----//
-        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_RGE_Range_u32;
-        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_VCOSEL_u32;
-        RCC_OscInitStruct.PLL.PLLRGE = pll1OscCfg_ps->PLL_FRACN_u32;
-
-        //---- Cortex M7 System Clk Cfg ----//
-        RCC_ClkInitStruct.ClockType      = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                            | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
-                                            | RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
-                                            
-        RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK; 
-        RCC_ClkInitStruct.SYSCLKDivider  = bspOscCfg_ps->SysClk_Divider_u32;
-        RCC_ClkInitStruct.AHBCLKDivider  = bspOscCfg_ps->AHB_Divider_u32;
-        RCC_ClkInitStruct.APB1CLKDivider = bspOscCfg_ps->APB1_Divider_u32;
-        RCC_ClkInitStruct.APB2CLKDivider = bspOscCfg_ps->APB2_Divider_u32;
-        RCC_ClkInitStruct.APB3CLKDivider = bspOscCfg_ps->APB3_Divider_u32;
-        RCC_ClkInitStruct.APB4CLKDivider = bspOscCfg_ps->APB4_Divider_u32;
-
-#elif defined FMKCPU_STM32_ECU_FAMILY_F
-
-        RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-        RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-        RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-        RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-#else 
-    #error("Unknwon Stm32 Family")
-#endif      
+        Ret_e = FMKCPU_Get_SystemClockConfig( f_SystemCoreFreq_e,
+                                              &bspOscCfg_ps,
+                                              &pll1OscCfg_ps,
+                                              &pllOtherCfg_pps);
+        if(Ret_e == RC_OK)
+        {
+            Ret_e = FMKCPU_Set_BspSystemClockCfg(  &RCC_OscInitStruct,
+                                                    &RCC_ClkInitStruct,
+                                                    bspOscCfg_ps,
+                                                    pll1OscCfg_ps);
+        }
         
-        bspRet_e = HAL_PWREx_ControlVoltageScaling(FMKCPU_CTRL_VOLTAGE_SCALING);
+        if(Ret_e == RC_OK)
+        {
+            bspRet_e = HAL_PWREx_ControlVoltageScaling(FMKCPU_CTRL_VOLTAGE_SCALING);
+        }
 
-        if(bspRet_e != HAL_OK)
+        if((Ret_e == RC_OK)
+        && (bspRet_e != HAL_OK))
         {
             Ret_e = RC_ERROR_WRONG_RESULT;
         }    
-        if(bspRet_e == HAL_OK)
+        if((Ret_e == RC_OK)
+        && (bspRet_e == HAL_OK))
         {
             bspRet_e = HAL_RCC_OscConfig(&RCC_OscInitStruct);
         }
-        if(bspRet_e == HAL_OK)
+        if((Ret_e == RC_OK)
+        && (bspRet_e == HAL_OK))
         {
-            bspRet_e = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+            bspRet_e = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FMKCPU_FLASH_LENTECY);
         }
         if(bspRet_e != HAL_OK)
         {
@@ -509,18 +512,19 @@ t_eReturnCode FMKCPU_Set_SysClockCfg(t_eFMKCPU_CoreClockSpeed f_SystemCoreFreq_e
         else 
         {
             //---- perform specific PLL configuration with peripheral ----//
-            Ret_e = FMKCPU_SetPeriphClockCfg((t_sFMKCPU_PllOscCfg **)c_FmkCpu_PllOtherCfg_as[f_SystemCoreFreq_e]);
+            Ret_e = FMKCPU_SetPeriphClockCfg(pllOtherCfg_pps);
             if(Ret_e == RC_OK)
             {
-                Ret_e = SafeMem_memcpy( &g_SysClockValue_ua8, 
-                                        &c_FmkCpu_CoreClkValue_ua8[f_SystemCoreFreq_e], 
-                                        (t_uint16)(sizeof(t_uint8) * FMKCPU_SYS_CLOCK_NB));
+                Ret_e = FMKCPU_ComputeSystemClockValues( bspOscCfg_ps,
+                                                         pll1OscCfg_ps,
+                                                         pllOtherCfg_pps,
+                                                         &g_SysClockValue_ua16[0]);
                 if(Ret_e == RC_OK)
                 {
                     //------Get the system core frequency set by the bsp------//
                     bspSysClkFreqHz_u32 = HAL_RCC_GetSysClockFreq();
                     //------Get the system core frequency wanted by user------//
-                    SysClkFreqHz_u32 = (t_uint32)g_SysClockValue_ua8[FMKCPU_SYS_CLOCK_SYSTEM];
+                    SysClkFreqHz_u32 = (t_uint32)g_SysClockValue_ua16[FMKCPU_SYS_CLOCK_SYSTEM];
                     //------Compare both value------//
                     if(bspSysClkFreqHz_u32 != (t_uint32)(SysClkFreqHz_u32 * CST_MHZ_TO_HZ))
                     {
@@ -546,73 +550,37 @@ t_eReturnCode FMKCPU_Set_HardwareInit(void)
 {
     t_eReturnCode Ret_e = RC_OK;
     HAL_StatusTypeDef bspRet_e = HAL_OK;
-#if defined (FMKCPU_STM32_ECU_FAMILY_H7)
-    MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
-    /* Disables the MPU */
-    HAL_MPU_Disable();
+    Ret_e = FMKCPU_Set_BspHardwareInitBeforeHal();
 
-    /** Initializes and configures the Region and the memory to be protected
-     */
-    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-    MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-    MPU_InitStruct.BaseAddress = 0x0;
-    MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
-    MPU_InitStruct.SubRegionDisable = 0x87;
-    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-    MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
-    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
-    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+    if(Ret_e == RC_OK)
+    {
+        bspRet_e = HAL_Init();
+    }
 
-    HAL_MPU_ConfigRegion(&MPU_InitStruct);
-    /* Enables the MPU */
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
-#endif // FMKCPU_STM32_ECU_FAMILY_H7
-
-    bspRet_e = HAL_Init();
-
-    if(bspRet_e == HAL_OK)
+    if((Ret_e == RC_OK)
+    && (bspRet_e == HAL_OK))
     {
         //---- reconfigure init tick with high NVIC Priority ----//
         bspRet_e = HAL_InitTick(0x00);
     }    
-    if(bspRet_e != HAL_OK)
+    if((Ret_e == RC_OK)
+    && (bspRet_e != HAL_OK))
     {
         Ret_e = RC_ERROR_WRONG_RESULT;
     }
+    if(Ret_e == RC_OK)
+    {
+        SCB->SHCSR |= (SCB_SHCSR_MEMFAULTENA_Msk |
+                       SCB_SHCSR_BUSFAULTENA_Msk |
+                       SCB_SHCSR_USGFAULTENA_Msk);
+    }
 
-#if defined(FMKCPU_STM32_ECU_FAMILY_G4)
-    
     if(Ret_e == RC_OK)
     {
-        Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_SYSCFG, FMKCPU_CLOCKPORT_OPE_ENABLE);
+        Ret_e = FMKCPU_Set_BspHardwareInitAfterHal();
     }
-    if(Ret_e == RC_OK)
-    {
-        Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_PWR, FMKCPU_CLOCKPORT_OPE_ENABLE);
-    }
-    if(Ret_e == RC_OK)
-    {
-        HAL_PWREx_DisableUCPDDeadBattery();
-    }
-#elif defined(FMKCPU_STM32_ECU_FAMILY_H7)
-    if(Ret_e == RC_OK)
-    {
-        Ret_e = FMKCPU_Set_HwClock(FMKCPU_RCC_CLK_SYSCFG, FMKCPU_CLOCKPORT_OPE_ENABLE);
 
-        if(Ret_e == RC_OK)
-        {                        
-            bspRet_e = HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
-            
-            if(bspRet_e != HAL_OK)
-            {
-                Ret_e = RC_ERROR_WRONG_RESULT;
-            }
-        }
-    }
-#endif
     //---- enable the FPU (Float Unit Point) ---//
     if(Ret_e == RC_OK)
     {
@@ -911,6 +879,37 @@ t_eReturnCode FMKCPU_GetOscRccSrc(  t_eFMKCPU_ClockPort f_clockPort_e,
 /***********************************
  * FMKCPU_SysClkValue
  ***********************************/
+t_eReturnCode FMKCPU_GetRccClockValue(t_eFMKCPU_ClockPort f_clockPort_e,
+                                      t_uint16 *f_OscValueMHz_pu16)
+{
+    t_eReturnCode Ret_e = RC_OK;
+    t_eFMKCPU_SysClkOsc clkOsc_e = FMKCPU_SYS_CLOCK_NB;
+
+    if(f_clockPort_e >= FMKCPU_RCC_CLK_NB)
+    {
+        Ret_e = RC_ERROR_PARAM_INVALID;
+        ASSERT((t_uint16)Ret_e);
+    }
+    if(f_OscValueMHz_pu16 == (t_uint16 *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+        ASSERT((t_uint16)Ret_e);
+    }
+    if(Ret_e == RC_OK)
+    {
+        Ret_e = FMKCPU_GetOscRccSrc(f_clockPort_e, &clkOsc_e);
+    }
+    if(Ret_e == RC_OK)
+    {
+        Ret_e = FMKCPU_GetSysClkValue(clkOsc_e, f_OscValueMHz_pu16);
+    }
+
+    return Ret_e;
+}
+
+/***********************************
+ * FMKCPU_SysClkValue
+ ***********************************/
 t_eReturnCode FMKCPU_GetSysClkValue(    t_eFMKCPU_SysClkOsc f_ClkOsc_e,
                                         t_uint16 * f_OscValueMHz_pu16)
 {
@@ -933,7 +932,7 @@ t_eReturnCode FMKCPU_GetSysClkValue(    t_eFMKCPU_SysClkOsc f_ClkOsc_e,
     }
     if(Ret_e == RC_OK)
     {
-        *f_OscValueMHz_pu16 = (t_uint16)g_SysClockValue_ua8[f_ClkOsc_e];
+        *f_OscValueMHz_pu16 = (t_uint16)g_SysClockValue_ua16[f_ClkOsc_e];
     }
 
     return Ret_e;
@@ -961,28 +960,7 @@ static void s_FMKCPU_CheckResetCpuFlag(void)
         g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_SFRST;
         FMKSRL_LOG("[RESET] Software Reset (SFTRST)\n");
     }
-#if defined(FMKCPU_STM32_ECU_FAMILY_G4)
-    if (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST))
-    {
-        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_OBLRST;
-        FMKSRL_LOG("[RESET] Option Byte Loader Reset (OBLRST)\n");
-    }
-    if (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST))
-    {
-        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_IWDRST;
-        FMKSRL_LOG("[RESET] Independent Watchdog Reset (IWDGRST)\n");
-    }
-    if (__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST))
-    {
-        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_WWDRST;
-        FMKSRL_LOG("[RESET] Window Watchdog Reset (WWDGRST)\n");
-    }
-    if (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST))
-    {
-        g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_LPWRRST;
-        FMKSRL_LOG("[RESET] Low Power Reset (LPWRRST)\n");
-    }
-#endif // FMKCPU_STM32_ECU_FAMILY_G4
+    (void)FMKCPU_CheckResetCpuFlagSpecific(&g_CpuResetFlagInfo_e);
 
     // Efface tous les flags une fois lus
     __HAL_RCC_CLEAR_RESET_FLAGS();
@@ -1491,6 +1469,94 @@ static t_eReturnCode s_FMKCPU_DmaDiagMngmt( t_eFMKCPU_DmaController f_dmaCtrl_e,
  * BSP CALLBACK IMPLEMENTATION
  *****************************************/
 
+static void s_FMKCPU_CoreFaultHandler(t_uint32 *f_stackFrame_pu32,
+                                      t_uint32 f_excReturn_u32,
+                                      t_eFMKCPU_CoreFault f_faultType_e)
+{
+    t_uint32 tick_u32 = HAL_GetTick();
+
+    g_CoreFaultInfo_s.faultType_e = f_faultType_e;
+    g_CoreFaultInfo_s.cfsr_u32 = SCB->CFSR;
+    g_CoreFaultInfo_s.hfsr_u32 = SCB->HFSR;
+    g_CoreFaultInfo_s.dfsr_u32 = SCB->DFSR;
+    g_CoreFaultInfo_s.afsr_u32 = SCB->AFSR;
+    g_CoreFaultInfo_s.mmfar_u32 = SCB->MMFAR;
+    g_CoreFaultInfo_s.bfar_u32 = SCB->BFAR;
+    g_CoreFaultInfo_s.msp_u32 = __get_MSP();
+    g_CoreFaultInfo_s.psp_u32 = __get_PSP();
+    g_CoreFaultInfo_s.excReturn_u32 = f_excReturn_u32;
+
+    if(f_stackFrame_pu32 != (t_uint32 *)NULL)
+    {
+        g_CoreFaultInfo_s.stackedR0_u32 = f_stackFrame_pu32[0];
+        g_CoreFaultInfo_s.stackedR1_u32 = f_stackFrame_pu32[1];
+        g_CoreFaultInfo_s.stackedR2_u32 = f_stackFrame_pu32[2];
+        g_CoreFaultInfo_s.stackedR3_u32 = f_stackFrame_pu32[3];
+        g_CoreFaultInfo_s.stackedR12_u32 = f_stackFrame_pu32[4];
+        g_CoreFaultInfo_s.stackedLr_u32 = f_stackFrame_pu32[5];
+        g_CoreFaultInfo_s.stackedPc_u32 = f_stackFrame_pu32[6];
+        g_CoreFaultInfo_s.stackedXpsr_u32 = f_stackFrame_pu32[7];
+    }
+
+    APPSYS_AssertionTrap((t_uint16)f_faultType_e,
+                         "CPU_FAULT",
+                         g_CoreFaultInfo_s.stackedPc_u32,
+                         tick_u32);
+
+    __BKPT(0);
+    while(1)
+    {
+    }
+}
+
+__attribute__((naked)) void HardFault_Handler(void)
+{
+    __asm volatile(
+        "tst lr, #4\n"
+        "ite eq\n"
+        "mrseq r0, msp\n"
+        "mrsne r0, psp\n"
+        "mov r1, lr\n"
+        "movs r2, #1\n"
+        "b s_FMKCPU_CoreFaultHandler\n");
+}
+
+__attribute__((naked)) void MemManage_Handler(void)
+{
+    __asm volatile(
+        "tst lr, #4\n"
+        "ite eq\n"
+        "mrseq r0, msp\n"
+        "mrsne r0, psp\n"
+        "mov r1, lr\n"
+        "movs r2, #2\n"
+        "b s_FMKCPU_CoreFaultHandler\n");
+}
+
+__attribute__((naked)) void BusFault_Handler(void)
+{
+    __asm volatile(
+        "tst lr, #4\n"
+        "ite eq\n"
+        "mrseq r0, msp\n"
+        "mrsne r0, psp\n"
+        "mov r1, lr\n"
+        "movs r2, #3\n"
+        "b s_FMKCPU_CoreFaultHandler\n");
+}
+
+__attribute__((naked)) void UsageFault_Handler(void)
+{
+    __asm volatile(
+        "tst lr, #4\n"
+        "ite eq\n"
+        "mrseq r0, msp\n"
+        "mrsne r0, psp\n"
+        "mov r1, lr\n"
+        "movs r2, #4\n"
+        "b s_FMKCPU_CoreFaultHandler\n");
+}
+
 
 /***********************************
  * SysTick_Handler
@@ -1510,6 +1576,17 @@ void WWDG_IRQHandler(void)
 //
     //    // deal with error
     //}
+}
+
+void WAKEUP_PIN_IRQHandler(void)
+{
+    volatile uint32_t activeIrq = (SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk);
+    volatile uint32_t irqNum = activeIrq - 16U;
+    (void)irqNum;
+
+    while (1)
+    {
+    }
 }
 //************************************************************************************
 // End of File

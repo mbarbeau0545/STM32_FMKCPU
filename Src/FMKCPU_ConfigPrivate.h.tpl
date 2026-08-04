@@ -148,7 +148,7 @@
         {RCC_PLLM_DIV1,         (t_uint32)20,                RCC_PLLR_DIV2,          RCC_PLLQ_DIV2,           RCC_PLLP_DIV8,              RCC_SYSCLK_DIV1,             RCC_HCLK_DIV2,          RCC_HCLK_DIV2}, //  FMKCPU_CORE_CLOCK_SPEED_160MHZ
     };
 
-    const t_uint8 c_FmkCpu_CoreClkValue_ua8[FMKCPU_CORE_CLOCK_SPEED_NB][FMKCPU_SYS_CLOCK_NB] = 
+    const t_uint8 c_FmkCpu_CoreClkValue_ua16[FMKCPU_CORE_CLOCK_SPEED_NB][FMKCPU_SYS_CLOCK_NB] = 
     {//    HSE                                      HSI                             SYSTEM                           HCLK1                         AHB1                          AHB2                       APB1/PCLK1                      APB2/PCLK2                   PLLQ                          PLLP 
         {(t_uint8)8,                            (t_uint8)16,                      (t_uint8)12,                   (t_uint8)12,                    (t_uint8)12,                 (t_uint8)12,                 (t_uint8)12,                    (t_uint8)12,                  (t_uint8)48,                  (t_uint8)48},  //  FMKCPU_CORE_CLOCK_SPEED_8MHZ
         {(t_uint8)8,                            (t_uint8)16,                      (t_uint8)16,                   (t_uint8)16,                    (t_uint8)16,                 (t_uint8)16,                 (t_uint8)16,                    (t_uint8)16,                  (t_uint8)64,                  (t_uint8)42},  //  FMKCPU_CORE_CLOCK_SPEED_16MHZ
@@ -183,7 +183,7 @@
     const t_sFMKCPU_SysOscCfg c_FmkCpu_SysOscCfg_s = {
     // PLLM_Divider_u32         PPLN_Multplier_u32          PLLR_Divider_u32        PPLQ_Divider_u32         PLLP_Divider_u32            AHB_Divider_u32                  APB1_Divider_u32        APB2_Divider_u32
     };
-    const t_uint8 c_FmkCpu_CoreClkValue_ua8[FMKCPU_SYS_CLOCK_NB] = 
+    const t_uint8 c_FmkCpu_CoreClkValue_ua16[FMKCPU_SYS_CLOCK_NB] = 
     {
         (t_uint8)0,     // FMKCPU_SYS_CLOCK_HSI
         (t_uint8)0,    // FMKCPU_SYS_CLOCK_CORE

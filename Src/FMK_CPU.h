@@ -102,6 +102,16 @@
     t_eReturnCode FMKCPU_GetState(t_eCyclicModState *f_State_pe);
     /**
     *
+    *	@brief      Get the last captured CPU core fault information.\n
+    *
+    *	@param[out] f_faultInfo_ps : storage for the last fault snapshot.
+    *
+    *   @retval RC_OK                             @ref RC_OK
+    *   @retval RC_ERROR_PTR_NULL                 @ref RC_ERROR_PTR_NULL
+    */
+    t_eReturnCode FMKCPU_GetLastCoreFaultInfo(t_sFMKCPU_CoreFaultInfo *f_faultInfo_ps);
+    /**
+    *
     *	@brief Function to update the module state.\n
     *
     *	@param[in]  f_State_e : the new value, value from @ref t_eCyclicModState
@@ -233,6 +243,19 @@
     */
     t_eReturnCode FMKCPU_GetOscRccSrc(  t_eFMKCPU_ClockPort f_clockPort_e,
                                         t_eFMKCPU_SysClkOsc * f_ClkOsc_pe);
+    /**
+    *
+    *	@brief      Return the effective frequency associated with an RCC clock port.\n
+    *
+    *	@param[in]  f_clockPort_e        : RCC clock port, value from @ref t_eFMKCPU_ClockPort
+    *	@param[out] f_OscValueMHz_pu16   : storage for the current frequency in MHz.
+    *
+    *   @retval RC_OK                             @ref RC_OK
+    *   @retval RC_ERROR_PARAM_INVALID            @ref RC_ERROR_PARAM_INVALID
+    *   @retval RC_ERROR_PTR_NULL                 @ref RC_ERROR_PTR_NULL
+    */
+    t_eReturnCode FMKCPU_GetRccClockValue(t_eFMKCPU_ClockPort f_clockPort_e,
+                                          t_uint16 *f_OscValueMHz_pu16);
     /**
     *
     *	@brief
