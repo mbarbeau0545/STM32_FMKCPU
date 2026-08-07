@@ -21,6 +21,8 @@
 // ********************************************************************
 // *                      Defines
 // ********************************************************************
+/// @brief Backup-register marker proving that a complete calendar value was set.
+#define FMKCPU_RTC_BACKUP_MAGIC ((t_uint32)0x46524354UL)
 
 // ********************************************************************
 // *                      Types
@@ -84,12 +86,18 @@ t_eFMKCPU_ClockPortOpe g_DmaCtrlState_ae[FMKCPU_DMA_CTRL_NB];
 static t_eCyclicModState g_FmkCpu_ModState_e = STATE_CYCLIC_CFG;
 
 IWDG_HandleTypeDef g_iwdgInfos_s = {0};
+/// @brief RTC HAL handle owned exclusively by FMK_CPU.
+static RTC_HandleTypeDef g_RtcInfo_s = {0};
 
 t_uint16 g_SysClockValue_ua16[FMKCPU_SYS_CLOCK_NB];
 t_eFMKCPU_CpuResetFlag g_CpuResetFlagInfo_e = FMKCPU_RESET_CAUSE_NONE;
 volatile t_sFMKCPU_CoreFaultInfo g_CoreFaultInfo_s = {0};
 t_bool g_IsSysClkInit_b = (t_bool)FALSE;
 t_bool g_isWwgInit_b = (t_bool)FALSE;
+/// @brief RTC peripheral initialization state.
+static t_bool g_IsRtcInit_b = (t_bool)FALSE;
+/// @brief TRUE when a complete date/time was explicitly set and the backup marker is present.
+static t_bool g_IsRtcDateTimeValid_b = (t_bool)FALSE;
 //********************************************************************************
 //                      Local functions - Prototypes
 //********************************************************************************
@@ -98,6 +106,16 @@ t_bool g_isWwgInit_b = (t_bool)FALSE;
  *	@brief      Perform all cyclic operatiDiagnostic purpose to know why the Cpu has reset.
  */
 static void s_FMKCPU_CheckResetCpuFlag(void);
+/** @brief Configure the RTC and recover its persistent validity marker. */
+static t_eReturnCode s_FMKCPU_RtcInit(void);
+/** @brief Validate one public time value. */
+static t_eReturnCode s_FMKCPU_ValidateTime(const t_sFMKCPU_Time * f_Time_ps);
+/** @brief Validate one public calendar date, including leap years and month lengths. */
+static t_eReturnCode s_FMKCPU_ValidateDate(const t_sFMKCPU_Date * f_Date_ps);
+/** @brief Return TRUE when the supplied year is a Gregorian leap year. */
+static t_bool s_FMKCPU_IsLeapYear(t_uint16 f_Year_u16);
+/** @brief Return the number of days of one validated month. */
+static t_uint8 s_FMKCPU_GetDaysInMonth(t_uint16 f_Year_u16, t_uint8 f_Month_u8);
 static void s_FMKCPU_CoreFaultHandler(t_uint32 *f_stackFrame_pu32,
                                       t_uint32 f_excReturn_u32,
                                       t_eFMKCPU_CoreFault f_faultType_e) __attribute__((used, noinline));
@@ -240,6 +258,7 @@ t_eReturnCode FMKCPU_Init(void)
     t_uint8 idxDma_u8;
     t_uint8 idxChnl_u8;
     t_uint8 idxDmaMux_u8;
+    t_eReturnCode Ret_e = RC_OK;
 
     //--------- Loop on every Dma ---------//
     for(idxDma_u8 = (t_uint8)0 ; idxDma_u8 < FMKCPU_DMA_CTRL_NB ; idxDma_u8++)
@@ -266,7 +285,18 @@ t_eReturnCode FMKCPU_Init(void)
         g_DmaMuxState_ae[idxDmaMux_u8] = FMKCPU_CLOCKPORT_OPE_DISABLE;
     }
 
-    return RC_OK;
+    //--------- Configure the RTC only after the system clock was initialized ---------//
+    if(Ret_e == RC_OK)
+    {
+        Ret_e = s_FMKCPU_RtcInit();
+    }
+
+    if(Ret_e < RC_OK)
+    {
+        ASSERT((t_sint32)Ret_e);
+    }
+
+    return Ret_e;
 }
 /*********************************
  * FMKCPU_Cyclic
@@ -446,6 +476,295 @@ void FMKCPU_GetTick(t_uint32 * f_tickms_pu32)
         *f_tickms_pu32 = (t_uint32)0;
     }
     return;
+}
+
+/*********************************
+ * FMKCPU_GetDateTime
+ *********************************/
+t_eReturnCode FMKCPU_GetDateTime(t_sFMKCPU_DateTime * f_DateTime_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+    RTC_TimeTypeDef BspTime_s = {0};
+    RTC_DateTypeDef BspDate_s = {0};
+
+    if(f_DateTime_ps == (t_sFMKCPU_DateTime *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        if(HAL_RTC_GetTime(&g_RtcInfo_s, &BspTime_s, RTC_FORMAT_BIN) != HAL_OK)
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        //---- Reading the date after the time unlocks/synchronizes the RTC shadow registers ----//
+        if((Ret_e == RC_OK) &&
+           (HAL_RTC_GetDate(&g_RtcInfo_s, &BspDate_s, RTC_FORMAT_BIN) != HAL_OK))
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        if(Ret_e == RC_OK)
+        {
+            f_DateTime_ps->time_s.hour_u8 = (t_uint8)BspTime_s.Hours;
+            f_DateTime_ps->time_s.minute_u8 = (t_uint8)BspTime_s.Minutes;
+            f_DateTime_ps->time_s.second_u8 = (t_uint8)BspTime_s.Seconds;
+            f_DateTime_ps->date_s.year_u16 = (t_uint16)(2000U + (t_uint16)BspDate_s.Year);
+            f_DateTime_ps->date_s.month_u8 = (t_uint8)BspDate_s.Month;
+            f_DateTime_ps->date_s.day_u8 = (t_uint8)BspDate_s.Date;
+            f_DateTime_ps->date_s.weekDay_u8 = (t_uint8)BspDate_s.WeekDay;
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_SetDateTime
+ *********************************/
+t_eReturnCode FMKCPU_SetDateTime(const t_sFMKCPU_DateTime * f_DateTime_ps)
+{
+    t_eReturnCode Ret_e;
+    RTC_TimeTypeDef BspTime_s = {0};
+    RTC_DateTypeDef BspDate_s = {0};
+
+    if(f_DateTime_ps == (const t_sFMKCPU_DateTime *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        Ret_e = s_FMKCPU_ValidateDate(&f_DateTime_ps->date_s);
+
+        if(Ret_e == RC_OK)
+        {
+            Ret_e = s_FMKCPU_ValidateTime(&f_DateTime_ps->time_s);
+        }
+
+        if(Ret_e == RC_OK)
+        {
+            BspDate_s.Year = (t_uint8)(f_DateTime_ps->date_s.year_u16 - 2000U);
+            BspDate_s.Month = f_DateTime_ps->date_s.month_u8;
+            BspDate_s.Date = f_DateTime_ps->date_s.day_u8;
+            BspDate_s.WeekDay = f_DateTime_ps->date_s.weekDay_u8;
+
+            BspTime_s.Hours = f_DateTime_ps->time_s.hour_u8;
+            BspTime_s.Minutes = f_DateTime_ps->time_s.minute_u8;
+            BspTime_s.Seconds = f_DateTime_ps->time_s.second_u8;
+            BspTime_s.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+            BspTime_s.StoreOperation = RTC_STOREOPERATION_RESET;
+
+            if(HAL_RTC_SetDate(&g_RtcInfo_s, &BspDate_s, RTC_FORMAT_BIN) != HAL_OK)
+            {
+                Ret_e = RC_ERROR_WRONG_RESULT;
+            }
+
+            if((Ret_e == RC_OK) &&
+               (HAL_RTC_SetTime(&g_RtcInfo_s, &BspTime_s, RTC_FORMAT_BIN) != HAL_OK))
+            {
+                Ret_e = RC_ERROR_WRONG_RESULT;
+            }
+        }
+
+        if(Ret_e == RC_OK)
+        {
+            HAL_RTCEx_BKUPWrite(&g_RtcInfo_s, RTC_BKP_DR0, FMKCPU_RTC_BACKUP_MAGIC);
+            g_IsRtcDateTimeValid_b = (t_bool)TRUE;
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_GetDate
+ *********************************/
+t_eReturnCode FMKCPU_GetDate(t_sFMKCPU_Date * f_Date_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+    RTC_TimeTypeDef BspTime_s = {0};
+    RTC_DateTypeDef BspDate_s = {0};
+
+    if(f_Date_ps == (t_sFMKCPU_Date *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        if(HAL_RTC_GetTime(&g_RtcInfo_s, &BspTime_s, RTC_FORMAT_BIN) != HAL_OK)
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        if((Ret_e == RC_OK) &&
+           (HAL_RTC_GetDate(&g_RtcInfo_s, &BspDate_s, RTC_FORMAT_BIN) != HAL_OK))
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        if(Ret_e == RC_OK)
+        {
+            f_Date_ps->year_u16 = (t_uint16)(2000U + (t_uint16)BspDate_s.Year);
+            f_Date_ps->month_u8 = (t_uint8)BspDate_s.Month;
+            f_Date_ps->day_u8 = (t_uint8)BspDate_s.Date;
+            f_Date_ps->weekDay_u8 = (t_uint8)BspDate_s.WeekDay;
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_SetDate
+ *********************************/
+t_eReturnCode FMKCPU_SetDate(const t_sFMKCPU_Date * f_Date_ps)
+{
+    t_eReturnCode Ret_e;
+    RTC_DateTypeDef BspDate_s = {0};
+
+    if(f_Date_ps == (const t_sFMKCPU_Date *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        Ret_e = s_FMKCPU_ValidateDate(f_Date_ps);
+
+        if(Ret_e == RC_OK)
+        {
+            BspDate_s.Year = (t_uint8)(f_Date_ps->year_u16 - 2000U);
+            BspDate_s.Month = f_Date_ps->month_u8;
+            BspDate_s.Date = f_Date_ps->day_u8;
+            BspDate_s.WeekDay = f_Date_ps->weekDay_u8;
+
+            if(HAL_RTC_SetDate(&g_RtcInfo_s, &BspDate_s, RTC_FORMAT_BIN) != HAL_OK)
+            {
+                Ret_e = RC_ERROR_WRONG_RESULT;
+            }
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_GetTime
+ *********************************/
+t_eReturnCode FMKCPU_GetTime(t_sFMKCPU_Time * f_Time_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+    RTC_TimeTypeDef BspTime_s = {0};
+    RTC_DateTypeDef BspDate_s = {0};
+
+    if(f_Time_ps == (t_sFMKCPU_Time *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        if(HAL_RTC_GetTime(&g_RtcInfo_s, &BspTime_s, RTC_FORMAT_BIN) != HAL_OK)
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        //---- Always read date after time to release the RTC shadow-register lock ----//
+        if((Ret_e == RC_OK) &&
+           (HAL_RTC_GetDate(&g_RtcInfo_s, &BspDate_s, RTC_FORMAT_BIN) != HAL_OK))
+        {
+            Ret_e = RC_ERROR_WRONG_RESULT;
+        }
+
+        if(Ret_e == RC_OK)
+        {
+            f_Time_ps->hour_u8 = (t_uint8)BspTime_s.Hours;
+            f_Time_ps->minute_u8 = (t_uint8)BspTime_s.Minutes;
+            f_Time_ps->second_u8 = (t_uint8)BspTime_s.Seconds;
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_SetTime
+ *********************************/
+t_eReturnCode FMKCPU_SetTime(const t_sFMKCPU_Time * f_Time_ps)
+{
+    t_eReturnCode Ret_e;
+    RTC_TimeTypeDef BspTime_s = {0};
+
+    if(f_Time_ps == (const t_sFMKCPU_Time *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        Ret_e = s_FMKCPU_ValidateTime(f_Time_ps);
+
+        if(Ret_e == RC_OK)
+        {
+            BspTime_s.Hours = f_Time_ps->hour_u8;
+            BspTime_s.Minutes = f_Time_ps->minute_u8;
+            BspTime_s.Seconds = f_Time_ps->second_u8;
+            BspTime_s.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+            BspTime_s.StoreOperation = RTC_STOREOPERATION_RESET;
+
+            if(HAL_RTC_SetTime(&g_RtcInfo_s, &BspTime_s, RTC_FORMAT_BIN) != HAL_OK)
+            {
+                Ret_e = RC_ERROR_WRONG_RESULT;
+            }
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * FMKCPU_IsDateTimeValid
+ *********************************/
+t_eReturnCode FMKCPU_IsDateTimeValid(t_bool * f_IsValid_pb)
+{
+    t_eReturnCode Ret_e = RC_OK;
+
+    if(f_IsValid_pb == (t_bool *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if(g_IsRtcInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        *f_IsValid_pb = g_IsRtcDateTimeValid_b;
+    }
+
+    return Ret_e;
 }
 
 /*********************************
@@ -940,6 +1259,134 @@ t_eReturnCode FMKCPU_GetSysClkValue(    t_eFMKCPU_SysClkOsc f_ClkOsc_e,
 //********************************************************************************
 //                      Local functions - Implementation
 //********************************************************************************
+/*********************************
+ * s_FMKCPU_RtcInit
+ *********************************/
+static t_eReturnCode s_FMKCPU_RtcInit(void)
+{
+    t_eReturnCode Ret_e;
+
+    g_IsRtcInit_b = (t_bool)FALSE;
+    g_IsRtcDateTimeValid_b = (t_bool)FALSE;
+
+    if(g_IsSysClkInit_b == (t_bool)FALSE)
+    {
+        Ret_e = RC_ERROR_MODULE_NOT_INITIALIZED;
+    }
+    else
+    {
+        Ret_e = FMKCPU_Set_BspRtcCfg(&g_RtcInfo_s);
+
+        if(Ret_e == RC_OK)
+        {
+            g_IsRtcInit_b = (t_bool)TRUE;
+
+            if(HAL_RTCEx_BKUPRead(&g_RtcInfo_s, RTC_BKP_DR0) == FMKCPU_RTC_BACKUP_MAGIC)
+            {
+                g_IsRtcDateTimeValid_b = (t_bool)TRUE;
+            }
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * s_FMKCPU_ValidateTime
+ *********************************/
+static t_eReturnCode s_FMKCPU_ValidateTime(const t_sFMKCPU_Time * f_Time_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+
+    if(f_Time_ps == (const t_sFMKCPU_Time *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if((f_Time_ps->hour_u8 > 23U) ||
+            (f_Time_ps->minute_u8 > 59U) ||
+            (f_Time_ps->second_u8 > 59U))
+    {
+        Ret_e = RC_ERROR_PARAM_INVALID;
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * s_FMKCPU_ValidateDate
+ *********************************/
+static t_eReturnCode s_FMKCPU_ValidateDate(const t_sFMKCPU_Date * f_Date_ps)
+{
+    t_eReturnCode Ret_e = RC_OK;
+    t_uint8 DaysInMonth_u8 = 0U;
+
+    if(f_Date_ps == (const t_sFMKCPU_Date *)NULL)
+    {
+        Ret_e = RC_ERROR_PTR_NULL;
+    }
+    else if((f_Date_ps->year_u16 < 2000U) ||
+            (f_Date_ps->year_u16 > 2099U) ||
+            (f_Date_ps->month_u8 < 1U) ||
+            (f_Date_ps->month_u8 > 12U) ||
+            (f_Date_ps->weekDay_u8 < 1U) ||
+            (f_Date_ps->weekDay_u8 > 7U))
+    {
+        Ret_e = RC_ERROR_PARAM_INVALID;
+    }
+    else
+    {
+        DaysInMonth_u8 = s_FMKCPU_GetDaysInMonth(f_Date_ps->year_u16, f_Date_ps->month_u8);
+
+        if((f_Date_ps->day_u8 < 1U) || (f_Date_ps->day_u8 > DaysInMonth_u8))
+        {
+            Ret_e = RC_ERROR_PARAM_INVALID;
+        }
+    }
+
+    return Ret_e;
+}
+
+/*********************************
+ * s_FMKCPU_IsLeapYear
+ *********************************/
+static t_bool s_FMKCPU_IsLeapYear(t_uint16 f_Year_u16)
+{
+    t_bool IsLeapYear_b = (t_bool)FALSE;
+
+    if(((f_Year_u16 % 4U) == 0U) &&
+       (((f_Year_u16 % 100U) != 0U) || ((f_Year_u16 % 400U) == 0U)))
+    {
+        IsLeapYear_b = (t_bool)TRUE;
+    }
+
+    return IsLeapYear_b;
+}
+
+/*********************************
+ * s_FMKCPU_GetDaysInMonth
+ *********************************/
+static t_uint8 s_FMKCPU_GetDaysInMonth(t_uint16 f_Year_u16, t_uint8 f_Month_u8)
+{
+    static const t_uint8 c_DaysInMonth_au8[12] =
+    {
+        31U, 28U, 31U, 30U, 31U, 30U,
+        31U, 31U, 30U, 31U, 30U, 31U
+    };
+    t_uint8 Days_u8 = 0U;
+
+    if((f_Month_u8 >= 1U) && (f_Month_u8 <= 12U))
+    {
+        Days_u8 = c_DaysInMonth_au8[f_Month_u8 - 1U];
+
+        if((f_Month_u8 == 2U) && (s_FMKCPU_IsLeapYear(f_Year_u16) == (t_bool)TRUE))
+        {
+            Days_u8 = 29U;
+        }
+    }
+
+    return Days_u8;
+}
+
 /*********************************
  * s_FMKCPU_CheckResetCpuFlag
  *********************************/

@@ -60,6 +60,30 @@
     /* CAUTION : Automatic generated code section for Structure: Start */
 
     /* CAUTION : Automatic generated code section for Structure: End */
+
+    /** @brief Calendar time independent from the STM32 HAL representation. */
+    typedef struct
+    {
+        t_uint8 hour_u8;    
+        t_uint8 minute_u8;
+        t_uint8 second_u8;
+    } t_sFMKCPU_Time;
+
+    /** @brief Calendar date independent from the STM32 HAL representation. */
+    typedef struct
+    {
+        t_uint16 year_u16;
+        t_uint8 month_u8;
+        t_uint8 day_u8;
+        t_uint8 weekDay_u8;
+    } t_sFMKCPU_Date;
+
+    /** @brief Coherent calendar date and time snapshot. */
+    typedef struct
+    {
+        t_sFMKCPU_Date date_s;
+        t_sFMKCPU_Time time_s;
+    } t_sFMKCPU_DateTime;
     // ********************************************************************
     // *                      Prototypes
     // ********************************************************************
@@ -148,6 +172,52 @@
     *   @retval RC_ERROR_WRONG_STATE              @ref RC_ERROR_WRONG_STATE
     */
     void FMKCPU_GetTick(t_uint32 * f_tickms_pu32);
+    /**
+    *
+    *   @brief      Read one coherent RTC date/time snapshot.
+    *   @note       The returned year uses the full 2000..2099 representation.
+    *
+    *   @param[out] f_DateTime_ps : destination date/time structure.
+    *
+    *   @retval RC_OK                             Date/time was read.
+    *   @retval RC_ERROR_PTR_NULL                 Output pointer is null.
+    *   @retval RC_ERROR_MODULE_NOT_INITIALIZED   RTC is not initialized.
+    *   @retval RC_ERROR_WRONG_RESULT             HAL RTC read failed.
+    */
+    t_eReturnCode FMKCPU_GetDateTime(t_sFMKCPU_DateTime * f_DateTime_ps);
+    /**
+    *
+    *   @brief      Set the complete RTC date and time.
+    *   @note       A successful call marks the RTC calendar as valid in a backup register.
+    *
+    *   @param[in] f_DateTime_ps : date/time to apply.
+    *
+    *   @retval RC_OK                             Date/time was applied.
+    *   @retval RC_ERROR_PTR_NULL                 Input pointer is null.
+    *   @retval RC_ERROR_PARAM_INVALID            Calendar value is invalid.
+    *   @retval RC_ERROR_MODULE_NOT_INITIALIZED   RTC is not initialized.
+    *   @retval RC_ERROR_WRONG_RESULT             HAL RTC write failed.
+    */
+    t_eReturnCode FMKCPU_SetDateTime(const t_sFMKCPU_DateTime * f_DateTime_ps);
+    /** @brief Read the current RTC date. */
+    t_eReturnCode FMKCPU_GetDate(t_sFMKCPU_Date * f_Date_ps);
+    /** @brief Set only the current RTC date. */
+    t_eReturnCode FMKCPU_SetDate(const t_sFMKCPU_Date * f_Date_ps);
+    /** @brief Read the current RTC time. */
+    t_eReturnCode FMKCPU_GetTime(t_sFMKCPU_Time * f_Time_ps);
+    /** @brief Set only the current RTC time. */
+    t_eReturnCode FMKCPU_SetTime(const t_sFMKCPU_Time * f_Time_ps);
+    /**
+    *
+    *   @brief      Report whether a complete date/time has previously been set.
+    *
+    *   @param[out] f_IsValid_pb : TRUE when the RTC backup validity marker is present.
+    *
+    *   @retval RC_OK                             Validity was returned.
+    *   @retval RC_ERROR_PTR_NULL                 Output pointer is null.
+    *   @retval RC_ERROR_MODULE_NOT_INITIALIZED   RTC is not initialized.
+    */
+    t_eReturnCode FMKCPU_IsDateTimeValid(t_bool * f_IsValid_pb);
     /**
     *
     *	@brief      Set the hardware configuration.\n
